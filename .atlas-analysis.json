@@ -1,0 +1,100 @@
+{
+  "projectType": "saas",
+  "projectName": "Verbalize",
+  "projectDescription": "A web-based assistant for technical writers that provides real-time documentation linting powered by Vale CLI.",
+  "theme": "palm",
+  "primaryColor": "#2563eb",
+  "lightColor": "#60a5fa",
+  "darkColor": "#1e40af",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/editor",
+              "features/style-guides",
+              "features/custom-rules",
+              "features/preview"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/setup",
+              "deployment/netlify",
+              "deployment/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/lint"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "api-reference/vale-integration",
+              "api-reference/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Support",
+            "pages": [
+              "resources/troubleshooting",
+              "resources/faq"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "resources/architecture",
+              "resources/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Real-time documentation linting with Vale CLI",
+    "Multiple style guide support (Google, Microsoft, Red Hat)",
+    "Custom rule uploads for personalized linting",
+    "Live Markdown preview with synchronized scrolling",
+    "Dark mode support with theme persistence",
+    "Three-column interface (Editor, Preview, Results)",
+    "File upload support for .md and .mdx documents",
+    "Detailed linting alerts with severity levels"
+  ],
+  "publicApiSurface": [
+    "POST /api/lint - Lint documentation text against selected style guides",
+    "ValeAlert interface - Structure for linting results",
+    "CustomRule interface - Structure for custom rule definitions",
+    "Style guide selection (Google, Microsoft, RedHat)",
+    "Vale CLI integration with temporary file processing",
+    "Custom rule validation with security constraints",
+    "Markdown rendering with react-markdown",
+    "Theme switching via next-themes"
+  ]
+}

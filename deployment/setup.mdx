@@ -1,0 +1,293 @@
+---
+title: 'Local Development Setup'
+description: 'Prerequisites and steps for setting up Verbalize for local development'
+---
+
+## Prerequisites
+
+Before setting up Verbalize locally, ensure you have the following installed on your system:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 20 or higher required for Next.js 16 compatibility
+  </Card>
+  <Card title="npm" icon="npm">
+    Comes bundled with Node.js for package management
+  </Card>
+  <Card title="Git" icon="git">
+    For cloning the repository and version control
+  </Card>
+  <Card title="curl or wget" icon="terminal">
+    Required for Vale binary installation (usually pre-installed)
+  </Card>
+</CardGroup>
+
+## System Requirements
+
+Verbalize supports the following platforms:
+
+| Platform | Architecture | Support Status |
+|----------|--------------|----------------|
+| **Linux** | x64 | ✅ Fully supported |
+| **macOS** | x64 (Intel) | ✅ Fully supported |
+| **macOS** | arm64 (Apple Silicon) | ✅ Fully supported |
+| **Windows** | x64 | ✅ Fully supported |
+
+<Note>
+  The Vale binary (version 3.9.5) is automatically downloaded and installed during `npm install` for your specific platform.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Verbalize repository to your local machine:
+
+    ```bash
+    git clone https://github.com/your-org/verbalize.git
+    cd verbalize
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required Node.js dependencies:
+
+    ```bash
+    npm install
+    ```
+
+    This command will:
+    - Install Next.js, React, and other frontend dependencies
+    - Install development tools (TypeScript, ESLint, Playwright)
+    - Automatically run the `postinstall` script to download Vale binary
+
+    <Accordion title="What happens during postinstall?">
+      The `postinstall` script executes `scripts/install-vale.js`, which:
+      1. Detects your operating system and architecture
+      2. Downloads Vale 3.9.5 from GitHub releases
+      3. Extracts the binary to the project root
+      4. Sets executable permissions (Unix-based systems)
+      
+      ```javascript
+      // From package.json
+      "scripts": {
+        "postinstall": "node scripts/install-vale.js"
+      }
+      ```
+    </Accordion>
+  </Step>
+
+  <Step title="Verify Vale Installation">
+    Confirm that Vale was installed successfully:
+
+    ```bash
+    ./vale --version
+    ```
+
+    Expected output:
+    ```
+    vale version 3.9.5
+    ```
+
+    <Warning>
+      If you see `vale: command not found`, the installation script may have failed. Run it manually:
+      ```bash
+      node scripts/install-vale.js
+      ```
+    </Warning>
+  </Step>
+
+  <Step title="Verify Style Guides">
+    Ensure the Vale style guides are present:
+
+    ```bash
+    ls -la styles/
+    ```
+
+    You should see three directories:
+    ```
+    styles/
+    ├── Google/
+    ├── Microsoft/
+    └── RedHat/
+    ```
+
+    These contain the pre-configured style rules for each documentation standard.
+  </Step>
+</Steps>
+
+## Starting the Development Server
+
+Once installation is complete, start the Next.js development server:
+
+```bash
+npm run dev
+```
+
+The application will be available at:
+
+<Card title="Local Development URL" icon="browser">
+  http://localhost:3000
+</Card>
+
+<Accordion title="Development server features">
+  - **Hot Module Replacement (HMR)**: Changes to code are reflected instantly
+  - **Fast Refresh**: React component state is preserved during updates
+  - **TypeScript Checking**: Real-time type errors in the console
+  - **API Routes**: Available at `http://localhost:3000/api/*`
+</Accordion>
+
+## Available Scripts
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `npm run dev` | Start development server on port 3000 | Active development |
+| `npm run build` | Create production build | Pre-deployment testing |
+| `npm run start` | Start production server | Testing production build locally |
+| `npm test` | Run Playwright E2E tests | Before committing changes |
+| `npm run lint` | Run ESLint checks | Code quality verification |
+
+### Example Workflow
+
+```bash
+# Development
+npm run dev
+
+# Before committing
+npm run lint
+npm test
+
+# Test production build
+npm run build
+npm run start
+```
+
+## Environment Configuration
+
+Verbalize works out-of-the-box without environment variables for local development. However, you can customize behavior:
+
+### Optional Environment Variables
+
+Create a `.env.local` file in the project root:
+
+```bash
+# Maximum text input size (default: 1MB)
+MAX_INPUT_SIZE=1048576
+
+# Enable debug logging
+NEXT_PUBLIC_DEBUG=true
+DEBUG=vale:*
+
+# Vale configuration paths (usually not needed)
+VALE_CONFIG_PATH=./.vale.ini
+VALE_STYLES_PATH=./styles
+```
+
+<Note>
+  `.env.local` is ignored by Git. Never commit sensitive information to version control.
+</Note>
+
+## Verifying Your Setup
+
+<Steps>
+  <Step title="Open the Application">
+    Navigate to http://localhost:3000 in your browser
+  </Step>
+
+  <Step title="Test the Linter">
+    1. Enter some sample text in the editor:
+    ```markdown
+    This is a test document. We will utilize this to verify the setup.
+    ```
+    2. Select a style guide (e.g., "Google")
+    3. Click "Lint Documentation"
+  </Step>
+
+  <Step title="Verify Results">
+    You should see lint suggestions, such as:
+    - **Google.WordList**: Use "use" instead of "utilize"
+    
+    If you see results, your setup is working correctly!
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error: Vale binary not found">
+    **Symptom:**
+    ```
+    Error: spawn vale ENOENT
+    ```
+
+    **Solution:**
+    ```bash
+    # Reinstall Vale manually
+    node scripts/install-vale.js
+
+    # Verify installation
+    ./vale --version
+    ```
+  </Accordion>
+
+  <Accordion title="Port 3000 already in use">
+    **Symptom:**
+    ```
+    Error: Port 3000 is already in use
+    ```
+
+    **Solution:**
+    ```bash
+    # Use a different port
+    PORT=3001 npm run dev
+
+    # Or kill the process using port 3000
+    lsof -ti:3000 | xargs kill
+    ```
+  </Accordion>
+
+  <Accordion title="TypeScript errors during development">
+    **Symptom:**
+    ```
+    Type error: Cannot find module '@/components/...'
+    ```
+
+    **Solution:**
+    1. Restart the TypeScript server in your IDE
+    2. Clear the `.next` cache:
+    ```bash
+    rm -rf .next
+    npm run dev
+    ```
+  </Accordion>
+
+  <Accordion title="Style guides not loading">
+    **Symptom:**
+    ```
+    Error: Could not find style 'Google'
+    ```
+
+    **Solution:**
+    Ensure the `.vale.ini` file exists and is properly configured:
+    ```ini
+    StylesPath = styles
+    MinAlertLevel = suggestion
+
+    Packages = Google, Microsoft, RedHat
+
+    [*.md]
+    BasedOnStyles = Vale, Google, Microsoft, RedHat
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deploy to Netlify" icon="rocket" href="/deployment/netlify">
+    Learn how to deploy Verbalize to production
+  </Card>
+  <Card title="Configuration Guide" icon="gear" href="/deployment/configuration">
+    Customize Vale settings and environment variables
+  </Card>
+</CardGroup>

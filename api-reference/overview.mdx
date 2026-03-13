@@ -1,0 +1,166 @@
+---
+title: 'API Overview'
+description: 'Core architecture and design of the Verbalize API'
+icon: 'code'
+---
+
+## Introduction
+
+The Verbalize API is a Next.js API route that processes documentation text through Vale CLI to provide real-time linting feedback. The API is designed for technical writers who need to validate content against style guides like Google, Microsoft, and Red Hat.
+
+## Architecture
+
+The API follows a simple request-response pattern:
+
+```
+┌─────────────────┐
+│  Client Request │
+│  POST /api/lint │
+└────────┬────────┘
+         │
+         │ JSON: { text, style, customRules }
+         ▼
+┌─────────────────────────┐
+│  Next.js API Route      │
+│  /app/api/lint/route.ts │
+└────────┬────────────────┘
+         │
+         │ 1. Validate input
+         │ 2. Create temp file
+         │ 3. Execute Vale CLI
+         ▼
+┌─────────────────┐
+│   Vale Engine   │
+│  (CLI Process)  │
+└────────┬────────┘
+         │
+         │ Apply style rules
+         │ Generate diagnostics
+         ▼
+┌─────────────────────────┐
+│  JSON Response          │
+│  Array of ValeAlert     │
+└─────────────────────────┘
+```
+
+## Base URL
+
+The API is accessed at the following endpoint:
+
+```
+POST /api/lint
+```
+
+<Info>
+The API is serverless and deployed as a Netlify Function with a 10-second timeout limit.
+</Info>
+
+## Authentication
+
+No authentication is required. The API is publicly accessible and designed for open use.
+
+## Request Format
+
+All requests must use:
+- **Method**: `POST`
+- **Content-Type**: `application/json`
+- **Body**: JSON object with required fields
+
+## Response Format
+
+The API returns JSON responses in two formats:
+
+### Success Response
+
+An array of `ValeAlert` objects:
+
+```typescript
+interface ValeAlert {
+  Action: {
+    Name: string;
+    Params: string[] | null;
+  };
+  Span: [number, number];
+  Check: string;
+  Description: string;
+  Link: string;
+  Message: string;
+  Severity: string;
+  Match: string;
+  Line: number;
+}
+```
+
+**Status Code**: `200 OK`
+
+### Error Response
+
+An error object with a descriptive message:
+
+```json
+{
+  "error": "Error description"
+}
+```
+
+**Status Codes**: `400`, `500`
+
+## Rate Limits
+
+No explicit rate limiting is enforced, but the API is subject to:
+
+- **Concurrent Request Limits**: Multiple simultaneous requests may be queued
+- **Timeout Limits**: 10-second execution timeout per request
+- **Size Limits**: 1MB maximum text length
+
+## Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Typical Response Time" icon="clock">
+    < 2 seconds for documents under 10,000 words
+  </Card>
+  <Card title="Cold Start" icon="snowflake">
+    3-5 seconds for first request after deployment
+  </Card>
+  <Card title="Maximum Document Size" icon="file">
+    1MB (1,048,576 characters)
+  </Card>
+  <Card title="Processing Overhead" icon="gauge">
+    ~40% increase when using multiple style guides
+  </Card>
+</CardGroup>
+
+## Temporary File Processing
+
+The API creates temporary files during processing:
+
+1. **Temporary Directory**: Created in system temp directory with prefix `vale-`
+2. **Document File**: `doc.md` written with user text
+3. **Configuration File**: `.vale.ini` generated dynamically
+4. **Styles Directory**: Contains symlinks to built-in styles and custom rules
+5. **Cleanup**: All temporary files are removed after processing
+
+See the [Vale Integration](/api-reference/vale-integration) page for detailed implementation.
+
+## Error Handling
+
+The API implements comprehensive error handling for:
+
+- Input validation failures
+- Vale execution errors
+- File system errors
+- JSON parsing errors
+- Timeout errors
+
+See the [Error Handling](/api-reference/error-handling) page for complete error codes and responses.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="POST /api/lint" icon="arrow-right" href="/api-reference/lint">
+    Explore the main endpoint with parameter details and examples
+  </Card>
+  <Card title="Vale Integration" icon="code-branch" href="/api-reference/vale-integration">
+    Learn how Vale CLI is integrated and configured
+  </Card>
+</CardGroup>

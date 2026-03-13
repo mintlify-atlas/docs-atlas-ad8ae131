@@ -1,0 +1,388 @@
+---
+title: "Frequently Asked Questions"
+description: "Common questions about Verbalize functionality, deployment, and usage"
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is Verbalize?">
+    Verbalize is a web-based assistant for technical writers that provides real-time documentation linting powered by Vale CLI. It helps maintain consistent, high-quality technical documentation by validating content against industry-standard style guides from Google, Microsoft, and Red Hat.
+
+    **Key features:**
+    - Three-column interface (Editor, Preview, Results)
+    - Multiple style guide support
+    - Custom rule uploads
+    - Live Markdown preview
+    - Dark mode support
+  </Accordion>
+
+  <Accordion title="Is Verbalize free to use?">
+    Yes, Verbalize is open-source software released under the MIT License. You can:
+    - Use it for free on any project (commercial or personal)
+    - Host your own instance
+    - Modify the source code to fit your needs
+    - Contribute improvements back to the project
+
+    View the source code on [GitHub](https://github.com/mtgr18977/verbalize).
+  </Accordion>
+
+  <Accordion title="What style guides are supported?">
+    Verbalize supports three major style guides out of the box:
+
+    1. **Google Developer Documentation Style Guide**
+       - 160+ rules covering technical writing best practices
+       - Focus on clarity, consistency, and accessibility
+
+    2. **Microsoft Writing Style Guide**
+       - 115+ rules for technical content
+       - Emphasis on inclusive language and modern terminology
+
+    3. **Red Hat Documentation Style Guide**
+       - 290+ rules for enterprise documentation
+       - Comprehensive coverage of technical writing standards
+
+    You can also upload custom Vale rules to match your organization's specific requirements.
+  </Accordion>
+
+  <Accordion title="Can I use Verbalize offline?">
+    Not in the current version. Verbalize requires:
+    - An internet connection to access the web application
+    - Server-side processing for Vale CLI execution
+
+    However, you can:
+    - Deploy your own instance locally or on a private network
+    - Use Vale CLI directly for offline linting (without the web UI)
+
+    See our [Local Setup Guide](/deployment/setup) for self-hosting instructions.
+  </Accordion>
+
+  <Accordion title="Does Verbalize store my documents?">
+    No. Verbalize processes documents in memory and does not store your content:
+
+    1. Text is sent to the API endpoint for processing
+    2. Temporary files are created during Vale execution
+    3. All temporary files are deleted immediately after processing
+    4. No data is logged or persisted
+
+    From `app/api/lint/route.ts:138-143`:
+    ```typescript
+    finally {
+      // Clean up temporary files
+      try {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      } catch (rmError) {
+        console.error('Failed to remove temp directory:', rmError);
+      }
+    }
+    ```
+
+    <Warning>
+    If you're working with sensitive content, consider deploying a private instance of Verbalize on your own infrastructure.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="What file formats are supported?">
+    Verbalize supports Markdown files:
+    - `.md` - Standard Markdown
+    - `.mdx` - Markdown with JSX (MDX format)
+
+    You can:
+    - Type directly in the editor
+    - Upload files using the document upload button
+    - Paste content from other sources
+
+    The editor supports all standard Markdown syntax including:
+    - Headers, lists, links, images
+    - Code blocks with syntax highlighting
+    - Tables and blockquotes
+    - HTML (rendered in preview only)
+  </Accordion>
+
+  <Accordion title="What's the maximum document size?">
+    The API enforces the following limits:
+
+    | Limit | Value | Constant |
+    |-------|-------|----------|
+    | Maximum text length | 1MB | `MAX_TEXT_LENGTH = 1024 * 1024` |
+    | Maximum custom rules | 10 files | `MAX_CUSTOM_RULES = 10` |
+    | Maximum rule size | 10KB per file | `MAX_RULE_LENGTH = 10 * 1024` |
+
+    For optimal performance:
+    - Keep documents under 50KB
+    - Documents under 10,000 words process in ~500ms
+    - Larger documents may take 2-5 seconds
+
+    See [Performance Tuning](/deployment/configuration#performance-tuning) for optimization tips.
+  </Accordion>
+
+  <Accordion title="Can I use Verbalize with CI/CD pipelines?">
+    Yes! While Verbalize is designed as a web UI, you can integrate Vale CLI directly into your CI/CD pipeline:
+
+    <Tabs>
+      <Tab title="GitHub Actions">
+        ```yaml .github/workflows/lint.yml
+        name: Documentation Linting
+        on: [push, pull_request]
+
+        jobs:
+          lint:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v3
+              - name: Install Vale
+                run: |
+                  wget https://github.com/errata-ai/vale/releases/download/v2.20.1/vale_2.20.1_Linux_64-bit.tar.gz
+                  tar -xvzf vale_2.20.1_Linux_64-bit.tar.gz
+                  sudo mv vale /usr/local/bin/
+              - name: Run Vale
+                run: vale --config=.vale.ini docs/
+        ```
+      </Tab>
+      <Tab title="GitLab CI">
+        ```yaml .gitlab-ci.yml
+        lint-docs:
+          stage: test
+          image: jdkato/vale:latest
+          script:
+            - vale --config=.vale.ini docs/
+          only:
+            - merge_requests
+            - main
+        ```
+      </Tab>
+    </Tabs>
+
+    For manual API integration, see the [API Reference](/api-reference/lint).
+  </Accordion>
+
+  <Accordion title="How do I create custom Vale rules?">
+    Custom Vale rules are written in YAML and follow Vale's rule syntax:
+
+    ```yaml ProductName.yml
+    extends: substitution
+    message: "Use '%s' instead of '%s'"
+    level: error
+    ignorecase: false
+    swap:
+      tech writer: technical writer
+      Github: GitHub
+      Javascript: JavaScript
+    ```
+
+    To use custom rules in Verbalize:
+
+    <Steps>
+      <Step title="Create your rule file">
+        Save your rule as a `.yml` file (e.g., `ProductName.yml`)
+      </Step>
+      <Step title="Upload in the UI">
+        Click **Upload .yml rule** in the sidebar under Custom Rules
+      </Step>
+      <Step title="Run linting">
+        Your custom rules are automatically combined with the selected base style guide
+      </Step>
+    </Steps>
+
+    See [Custom Rules](/features/custom-rules) for comprehensive examples and rule types.
+  </Accordion>
+
+  <Accordion title="Why are my custom rules not working?">
+    Common issues with custom rules:
+
+    1. **Incorrect file extension**
+       - Must be `.yml` (not `.yaml`)
+
+    2. **Invalid YAML syntax**
+       - Check indentation (use spaces, not tabs)
+       - Validate with a YAML linter
+
+    3. **File too large**
+       - Maximum 10KB per rule file
+       - Split large rulesets into multiple files
+
+    4. **Unsupported rule type**
+       - Vale supports: existence, substitution, occurrence, repetition, consistency, conditional
+       - Check [Vale's documentation](https://vale.sh/docs/topics/styles/) for syntax
+
+    5. **Path traversal in filename**
+       - Filenames are sanitized to prevent security issues
+       - Use alphanumeric characters, dots, underscores, and hyphens only
+
+    From `app/api/lint/route.ts:88-93`:
+    ```typescript
+    const baseName = path.basename(ruleName);
+    const safeRuleName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!safeRuleName || safeRuleName === '.' || safeRuleName === '..') {
+      continue;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Does Verbalize work on mobile devices?">
+    Verbalize is optimized for desktop use due to its three-column interface and extensive text editing requirements. However, it is technically accessible on mobile devices:
+
+    **Mobile experience:**
+    - ✅ Fully responsive layout
+    - ✅ Touch-friendly controls
+    - ⚠️ Three columns stack vertically (may require scrolling)
+    - ⚠️ Limited screen space for editing
+
+    **Recommended:**
+    - Desktop or laptop for primary editing
+    - Tablet (iPad, Android tablet) for reviewing lint results
+    - Mobile for quick previews only
+
+    The layout uses a responsive grid:
+    ```typescript app/page.tsx:338
+    <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 overflow-hidden">
+      {/* Editor, Preview, Results columns */}
+    </div>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Deployment Questions
+
+<AccordionGroup>
+  <Accordion title="Can I deploy Verbalize on platforms other than Netlify?">
+    Yes! Verbalize is a standard Next.js application and can be deployed to:
+
+    | Platform | Support | Notes |
+    |----------|---------|-------|
+    | **Netlify** | ✅ Recommended | Native support, easy setup |
+    | **Vercel** | ✅ Full support | Next.js creators, seamless deployment |
+    | **AWS (Lambda + API Gateway)** | ✅ Supported | Requires function configuration |
+    | **Docker** | ✅ Supported | Use `next start` in container |
+    | **Traditional VPS** | ✅ Supported | Run with Node.js + PM2 |
+
+    **Key requirements:**
+    - Node.js 20+
+    - Vale binary must be executable
+    - File system access for temporary files
+    - ~10 second function timeout minimum
+
+    See [Deployment Setup](/deployment/setup) for detailed instructions.
+  </Accordion>
+
+  <Accordion title="How do I update the Vale style guides?">
+    Style guides are included in the `styles/` directory. To update:
+
+    <Steps>
+      <Step title="Download latest styles">
+        ```bash
+        cd styles/
+        vale sync
+        ```
+      </Step>
+      <Step title="Verify updates">
+        ```bash
+        ls -la Google/
+        ls -la Microsoft/
+        ls -la RedHat/
+        ```
+      </Step>
+      <Step title="Test locally">
+        ```bash
+        npm run dev
+        # Test with sample documents
+        ```
+      </Step>
+      <Step title="Deploy changes">
+        ```bash
+        git add styles/
+        git commit -m "Update Vale style guides"
+        git push
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+    Style guide updates are manual. Consider setting up automated checks for new Vale releases.
+    </Note>
+  </Accordion>
+
+  <Accordion title="What are the hosting costs?">
+    Hosting costs depend on your deployment platform and usage:
+
+    **Netlify (Recommended):**
+    - Free tier: 100GB bandwidth, 300 build minutes/month
+    - Typically free for personal/small team use
+    - Function invocations: 125k/month on free tier
+
+    **Vercel:**
+    - Free tier: 100GB bandwidth
+    - Function execution time: 100 hours/month
+
+    **Self-hosted VPS:**
+    - $5-20/month for basic VPS (DigitalOcean, Linode, etc.)
+    - Full control over resources
+
+    **AWS Lambda:**
+    - Pay per invocation (~$0.20 per 1M requests)
+    - Free tier: 1M requests/month
+
+    For typical usage (100-500 lint operations/day), the free tiers are usually sufficient.
+  </Accordion>
+</AccordionGroup>
+
+## Contributing
+
+<AccordionGroup>
+  <Accordion title="How can I contribute to Verbalize?">
+    We welcome contributions! Here's how you can help:
+
+    **Code contributions:**
+    1. Fork the repository
+    2. Create a feature branch
+    3. Make your changes with tests
+    4. Submit a pull request
+
+    **Other ways to contribute:**
+    - Report bugs via [GitHub Issues](https://github.com/mtgr18977/verbalize/issues)
+    - Suggest new features
+    - Improve documentation
+    - Share Vale rule examples
+    - Help other users in discussions
+
+    See [Contributing Guide](/resources/contributing) for detailed instructions.
+  </Accordion>
+
+  <Accordion title="What technologies should I know to contribute?">
+    To contribute to Verbalize, familiarity with these technologies is helpful:
+
+    **Required:**
+    - TypeScript / JavaScript
+    - React basics
+    - Next.js App Router
+
+    **Helpful:**
+    - Vale CLI and rule syntax
+    - Tailwind CSS
+    - Node.js file system APIs
+    - Playwright for testing
+
+    See [Architecture](/resources/architecture) for a comprehensive overview of the tech stack.
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="View Architecture" icon="diagram-project" href="/resources/architecture">
+    Learn how Verbalize works under the hood
+  </Card>
+  <Card title="Troubleshooting Guide" icon="wrench" href="/resources/troubleshooting">
+    Find solutions to common issues
+  </Card>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/mtgr18977/verbalize/discussions">
+    Ask questions and share ideas with the community
+  </Card>
+  <Card title="Report an Issue" icon="bug" href="https://github.com/mtgr18977/verbalize/issues">
+    Found a bug? Let us know!
+  </Card>
+</CardGroup>

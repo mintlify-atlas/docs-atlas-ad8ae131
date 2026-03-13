@@ -1,0 +1,679 @@
+---
+title: 'Error Handling'
+description: 'Comprehensive error codes and troubleshooting for the Verbalize API'
+icon: 'triangle-exclamation'
+---
+
+## Overview
+
+The Verbalize API implements comprehensive error handling with descriptive error messages and appropriate HTTP status codes. All errors return JSON responses with an `error` field containing a human-readable message.
+
+## Error Response Format
+
+```typescript
+interface ErrorResponse {
+  error: string;
+}
+```
+
+**HTTP Status Codes**:
+- `400` - Client-side errors (validation failures, invalid input)
+- `500` - Server-side errors (Vale execution failures, internal errors)
+
+## Validation Errors (400)
+
+Validation errors occur when the request doesn't meet input requirements. These errors are caught at `app/api/lint/route.ts:21-43`.
+
+### Missing or Invalid Text
+
+**Trigger**: Text field is missing, null, or not a string
+
+<CodeGroup>
+```json Response
+{
+  "error": "No text provided or invalid format"
+}
+```
+
+```javascript Example Request
+await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: null,  // Invalid: must be a string
+    style: 'Google'
+  })
+});
+// Returns: 400 with error message
+```
+</CodeGroup>
+
+**Source Code**:
+```typescript
+if (!text || typeof text !== 'string') {
+  return NextResponse.json(
+    { error: 'No text provided or invalid format' },
+    { status: 400 }
+  );
+}
+```
+**Location**: `app/api/lint/route.ts:21-23`
+
+---
+
+### Text Length Exceeded
+
+**Trigger**: Text exceeds 1,048,576 characters (1MB)
+
+<CodeGroup>
+```json Response
+{
+  "error": "Text exceeds maximum allowed length of 1048576 characters"
+}
+```
+
+```javascript Example Request
+const largeText = 'a'.repeat(1048577); // 1 character over limit
+
+await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: largeText,
+    style: 'Google'
+  })
+});
+// Returns: 400 with error message
+```
+</CodeGroup>
+
+**Source Code**:
+```typescript
+if (text.length > MAX_TEXT_LENGTH) {
+  return NextResponse.json(
+    { error: `Text exceeds maximum allowed length of ${MAX_TEXT_LENGTH} characters` },
+    { status: 400 }
+  );
+}
+```
+**Location**: `app/api/lint/route.ts:25-27`
+
+**Constant Definition**:
+```typescript
+const MAX_TEXT_LENGTH = 1024 * 1024; // 1MB
+```
+**Location**: `app/api/lint/route.ts:12`
+
+---
+
+### Invalid Style Guide
+
+**Trigger**: Style is not one of: `'Google'`, `'Microsoft'`, `'RedHat'`
+
+<CodeGroup>
+```json Response
+{
+  "error": "Invalid style guide selected"
+}
+```
+
+```javascript Example Request
+await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: 'Sample text',
+    style: 'Invalid'  // Not in allowed list
+  })
+});
+// Returns: 400 with error message
+```
+</CodeGroup>
+
+**Source Code**:
+```typescript
+if (!ALLOWED_STYLES.includes(style)) {
+  return NextResponse.json(
+    { error: 'Invalid style guide selected' },
+    { status: 400 }
+  );
+}
+```
+**Location**: `app/api/lint/route.ts:29-31`
+
+**Allowed Styles**:
+```typescript
+const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+```
+**Location**: `app/api/lint/route.ts:11`
+
+<Warning>
+Style guide names are case-sensitive. `'google'` or `'GOOGLE'` will be rejected.
+</Warning>
+
+---
+
+### Too Many Custom Rules
+
+**Trigger**: More than 10 custom rules provided
+
+<CodeGroup>
+```json Response
+{
+  "error": "Too many custom rules. Maximum is 10"
+}
+```
+
+```javascript Example Request
+const rules = Array.from({ length: 11 }, (_, i) => ({
+  name: `Rule${i}`,
+  content: 'extends: existence\nmessage: Test'
+}));
+
+await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: 'Sample text',
+    style: 'Google',
+    customRules: rules  // 11 rules exceeds limit
+  })
+});
+// Returns: 400 with error message
+```
+</CodeGroup>
+
+**Source Code**:
+```typescript
+if (customRules && Array.isArray(customRules)) {
+  if (customRules.length > MAX_CUSTOM_RULES) {
+    return NextResponse.json(
+      { error: `Too many custom rules. Maximum is ${MAX_CUSTOM_RULES}` },
+      { status: 400 }
+    );
+  }
+}
+```
+**Location**: `app/api/lint/route.ts:33-37`
+
+**Constant Definition**:
+```typescript
+const MAX_CUSTOM_RULES = 10;
+```
+**Location**: `app/api/lint/route.ts:13`
+
+---
+
+### Custom Rule Too Large
+
+**Trigger**: Individual rule content exceeds 10,240 characters (10KB)
+
+<CodeGroup>
+```json Response
+{
+  "error": "Rule \"MyRule\" exceeds maximum allowed length of 10240 characters"
+}
+```
+
+```javascript Example Request
+const largeRuleContent = 'a'.repeat(10241);
+
+await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    text: 'Sample text',
+    style: 'Google',
+    customRules: [
+      {
+        name: 'MyRule',
+        content: largeRuleContent  // Exceeds 10KB
+      }
+    ]
+  })
+});
+// Returns: 400 with error message
+```
+</CodeGroup>
+
+**Source Code**:
+```typescript
+for (const rule of customRules) {
+  if (rule.content && typeof rule.content === 'string' && 
+      rule.content.length > MAX_RULE_LENGTH) {
+    return NextResponse.json(
+      { error: `Rule "${rule.name}" exceeds maximum allowed length of ${MAX_RULE_LENGTH} characters` },
+      { status: 400 }
+    );
+  }
+}
+```
+**Location**: `app/api/lint/route.ts:38-42`
+
+**Constant Definition**:
+```typescript
+const MAX_RULE_LENGTH = 10 * 1024; // 10KB
+```
+**Location**: `app/api/lint/route.ts:14`
+
+---
+
+## Server Errors (500)
+
+Server errors occur during Vale execution or internal processing. These are caught at `app/api/lint/route.ts:124-149`.
+
+### Vale Execution Failed
+
+**Trigger**: Vale binary execution fails without parseable output
+
+<CodeGroup>
+```json Response
+{
+  "error": "Vale execution failed"
+}
+```
+</CodeGroup>
+
+**Possible Causes**:
+- Vale binary not found or not executable
+- Vale binary corrupted
+- Configuration file errors
+- System resource exhaustion
+- Timeout (Netlify Functions: 10 seconds)
+
+**Source Code**:
+```typescript
+try {
+  const { stdout } = await execFileAsync(
+    valePath,
+    [`--config=${iniFile}`, '--output=JSON', tmpFile]
+  );
+  const results = JSON.parse(stdout);
+  return NextResponse.json(results[tmpFile] || []);
+} catch (error: unknown) {
+  const execError = error as { stdout?: string; message?: string };
+  
+  if (execError.stdout) {
+    // Try to parse output even on non-zero exit
+    try {
+      const results = JSON.parse(execError.stdout);
+      return NextResponse.json(results[tmpFile] || []);
+    } catch {
+      return NextResponse.json(
+        { error: 'Failed to parse Vale output' },
+        { status: 500 }
+      );
+    }
+  }
+  
+  console.error('Vale execution failed:', execError.message || execError);
+  return NextResponse.json(
+    { error: 'Vale execution failed' },
+    { status: 500 }
+  );
+}
+```
+**Location**: `app/api/lint/route.ts:119-137`
+
+<Info>
+**Note**: Vale returns non-zero exit codes when it finds linting alerts. This is expected behavior and the API handles it by checking for stdout content.
+</Info>
+
+**Troubleshooting Steps**:
+
+1. **Verify Vale Installation**
+   ```bash
+   node scripts/install-vale.js
+   vale --version
+   ```
+
+2. **Check Vale Permissions**
+   ```bash
+   chmod +x vale
+   ```
+
+3. **Test Vale Manually**
+   ```bash
+   echo "test" > test.md
+   vale --output=JSON test.md
+   ```
+
+4. **Check Netlify Function Logs**
+   - Navigate to Netlify dashboard → Functions → View logs
+   - Look for Vale execution errors
+
+---
+
+### Failed to Parse Vale Output
+
+**Trigger**: Vale returns output that isn't valid JSON
+
+<CodeGroup>
+```json Response
+{
+  "error": "Failed to parse Vale output"
+}
+```
+</CodeGroup>
+
+**Possible Causes**:
+- Vale version incompatibility
+- Vale output corruption
+- Malformed rule definitions causing Vale crashes
+- Binary replacement or tampering
+
+**Source Code**:
+```typescript
+if (execError.stdout) {
+  try {
+    const results = JSON.parse(execError.stdout);
+    return NextResponse.json(results[tmpFile] || []);
+  } catch {
+    return NextResponse.json(
+      { error: 'Failed to parse Vale output' },
+      { status: 500 }
+    );
+  }
+}
+```
+**Location**: `app/api/lint/route.ts:127-134`
+
+**Troubleshooting**:
+- Reinstall Vale binary
+- Verify Vale outputs JSON: `vale --output=JSON <file>`
+- Check custom rules for syntax errors
+
+---
+
+### Internal Server Error
+
+**Trigger**: Unexpected errors during request processing
+
+<CodeGroup>
+```json Response
+{
+  "error": "Internal server error"
+}
+```
+</CodeGroup>
+
+**Possible Causes**:
+- JSON parsing failure on request body
+- File system permission errors
+- Out of memory conditions
+- Uncaught exceptions in error handlers
+
+**Source Code**:
+```typescript
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    // ... processing ...
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Internal server error:', err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+```
+**Location**: `app/api/lint/route.ts:16, 145-149`
+
+**Troubleshooting**:
+- Check Netlify Function logs for stack traces
+- Verify request body is valid JSON
+- Check for system resource limits
+
+---
+
+## Timeout Errors
+
+### Netlify Function Timeout
+
+**Limit**: 10 seconds (default)
+
+**Symptoms**:
+- Request hangs
+- No response received
+- Netlify shows timeout in logs
+
+**Mitigation Strategies**:
+
+1. **Reduce Document Size**
+   ```javascript
+   // Split large documents into chunks
+   const MAX_CHUNK_SIZE = 50000; // 50KB per request
+   const chunks = splitIntoChunks(text, MAX_CHUNK_SIZE);
+   
+   const results = await Promise.all(
+     chunks.map(chunk => 
+       fetch('/api/lint', {
+         method: 'POST',
+         body: JSON.stringify({ text: chunk, style })
+       })
+     )
+   );
+   ```
+
+2. **Limit Style Guides**
+   - Use one style guide instead of multiple
+   - Remove unused custom rules
+
+3. **Increase Timeout (netlify.toml)**
+   ```toml
+   [functions]
+     timeout = 30
+   ```
+
+4. **Optimize Vale Configuration**
+   - Use `MinAlertLevel = warning` instead of `suggestion`
+   - Disable unnecessary rules
+
+---
+
+## Client-Side Error Handling
+
+### Recommended Pattern
+
+```typescript
+interface LintResponse {
+  data?: ValeAlert[];
+  error?: string;
+}
+
+async function lintDocument(
+  text: string,
+  style: string,
+  customRules?: CustomRule[]
+): Promise<LintResponse> {
+  try {
+    const response = await fetch('/api/lint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, style, customRules })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return { error: data.error || 'Unknown error occurred' };
+    }
+    
+    return { data };
+    
+  } catch (error) {
+    // Network errors, JSON parse errors, etc.
+    return { 
+      error: error instanceof Error 
+        ? error.message 
+        : 'Failed to connect to linting service'
+    };
+  }
+}
+```
+
+### Error Display Example
+
+```typescript
+const handleLint = async () => {
+  setLoading(true);
+  setError(null);
+  
+  const { data, error } = await lintDocument(text, style, customRules);
+  
+  if (error) {
+    // Display user-friendly error message
+    switch (true) {
+      case error.includes('maximum allowed length'):
+        setError('Document is too large. Please reduce to under 1MB.');
+        break;
+      case error.includes('Invalid style guide'):
+        setError('Please select a valid style guide.');
+        break;
+      case error.includes('Vale execution failed'):
+        setError('Linting service unavailable. Please try again.');
+        break;
+      default:
+        setError(error);
+    }
+  } else {
+    setResults(data || []);
+  }
+  
+  setLoading(false);
+};
+```
+
+---
+
+## Error Recovery Strategies
+
+<CardGroup cols={2}>
+  <Card title="Retry Logic" icon="rotate">
+    Implement exponential backoff for transient failures
+  </Card>
+  <Card title="Fallback UI" icon="shield-halved">
+    Show cached results or graceful degradation
+  </Card>
+  <Card title="Error Boundaries" icon="square-exclamation">
+    Catch React component errors separately
+  </Card>
+  <Card title="User Feedback" icon="comment">
+    Provide actionable error messages with solutions
+  </Card>
+</CardGroup>
+
+### Retry Example
+
+```typescript
+async function lintWithRetry(
+  text: string,
+  style: string,
+  maxRetries: number = 3
+): Promise<ValeAlert[]> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch('/api/lint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, style })
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      }
+      
+      // Don't retry 400 errors (client mistakes)
+      if (response.status === 400) {
+        const error = await response.json();
+        throw new Error(error.error);
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => 
+        setTimeout(resolve, Math.pow(2, attempt) * 1000)
+      );
+      
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt === maxRetries - 1) throw lastError;
+    }
+  }
+  
+  throw lastError!;
+}
+```
+
+---
+
+## Logging and Debugging
+
+### Server-Side Logging
+
+The API logs errors to the console, which are captured in Netlify Function logs:
+
+```typescript
+// Vale execution errors
+console.error('Vale execution failed:', execError.message || execError);
+
+// Internal errors
+console.error('Internal server error:', err);
+
+// Cleanup warnings (non-critical)
+console.error('Failed to remove temp directory:', rmError);
+
+// Style symlink warnings
+console.warn('Failed to symlink existing styles:', err);
+```
+
+### Client-Side Logging
+
+```typescript
+try {
+  const response = await fetch('/api/lint', { /* ... */ });
+  const data = await response.json();
+  
+  if (response.ok && Array.isArray(data)) {
+    setResults(data as ValeAlert[]);
+  } else {
+    console.error('Linting error:', data);
+    alert('Linting failed: ' + (data.error || 'Unknown error'));
+  }
+} catch (error) {
+  console.error('Failed to lint:', error);
+  alert('Failed to connect to the linting service.');
+}
+```
+**Source**: `app/page.tsx:63-78`
+
+---
+
+## Error Reference Table
+
+| Status | Error Message | Cause | Solution |
+|--------|--------------|-------|----------|
+| 400 | No text provided or invalid format | Missing or non-string text field | Provide valid string in `text` field |
+| 400 | Text exceeds maximum allowed length... | Text > 1MB | Reduce document size or split into chunks |
+| 400 | Invalid style guide selected | Style not in allowed list | Use 'Google', 'Microsoft', or 'RedHat' |
+| 400 | Too many custom rules. Maximum is 10 | More than 10 custom rules | Remove some custom rules |
+| 400 | Rule "X" exceeds maximum... | Rule content > 10KB | Simplify rule or split into multiple rules |
+| 500 | Vale execution failed | Vale binary issues | Reinstall Vale, check permissions |
+| 500 | Failed to parse Vale output | Invalid JSON from Vale | Reinstall Vale, check rule syntax |
+| 500 | Internal server error | Unexpected server error | Check logs, verify request format |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="POST /api/lint" icon="arrow-right" href="/api-reference/lint">
+    Return to main endpoint documentation
+  </Card>
+  <Card title="Vale Integration" icon="code-branch" href="/api-reference/vale-integration">
+    Learn about Vale CLI integration details
+  </Card>
+</CardGroup>

@@ -1,0 +1,453 @@
+---
+title: 'Vale Integration'
+description: 'How Vale CLI is integrated into the Verbalize API'
+icon: 'code-branch'
+---
+
+## Overview
+
+Verbalize integrates Vale CLI as a subprocess to provide real-time linting feedback. Vale is a command-line tool that enforces style guidelines through customizable rules written in YAML.
+
+## Vale Binary Management
+
+### Installation
+
+The Vale binary is installed during the build process using a dedicated script:
+
+```bash
+node scripts/install-vale.js
+```
+
+### Binary Location
+
+The API locates the Vale binary at runtime:
+
+```typescript
+const valePath = path.join(
+  process.cwd(),
+  process.platform === 'win32' ? 'vale.exe' : 'vale'
+);
+```
+
+**Source**: `app/api/lint/route.ts:109`
+
+### Executable Permissions
+
+For serverless environments, the API ensures the binary has executable permissions:
+
+```typescript
+try {
+  await fs.chmod(valePath, 0o755);
+} catch (err) {
+  console.warn('Could not chmod vale binary:', err);
+}
+```
+
+**Source**: `app/api/lint/route.ts:113-117`
+
+<Warning>
+In serverless environments, file permissions may not persist across deployments. The API sets executable permissions on every request to ensure compatibility.
+</Warning>
+
+## Temporary File Processing
+
+### Why Temporary Files?
+
+Vale CLI requires file-based input - it cannot process text directly from stdin. The API creates temporary files for each request to accommodate this requirement.
+
+### Temporary Directory Structure
+
+```
+/tmp/vale-XXXXXX/
+├── doc.md              # User's documentation text
+├── .vale.ini           # Dynamically generated configuration
+└── styles/             # Style guides directory
+    ├── Google/         # Symlink to project styles/Google/
+    ├── Microsoft/      # Symlink to project styles/Microsoft/
+    ├── RedHat/         # Symlink to project styles/RedHat/
+    └── Custom/         # User's custom rules (if provided)
+        ├── meta.json
+        └── *.yml       # Custom rule files
+```
+
+### Directory Creation
+
+```typescript
+const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vale-'));
+const tmpFile = path.join(tmpDir, 'doc.md');
+await fs.writeFile(tmpFile, text);
+```
+
+**Source**: `app/api/lint/route.ts:45-47`
+
+### Styles Directory Setup
+
+The API creates a temporary styles directory and symlinks existing style guides:
+
+```typescript
+const tempStylesDir = path.join(tmpDir, 'styles');
+await fs.mkdir(tempStylesDir, { recursive: true });
+
+const stylesPath = path.join(process.cwd(), 'styles');
+const existingStyles = await fs.readdir(stylesPath);
+
+for (const styleFolder of existingStyles) {
+  const fullPath = path.join(stylesPath, styleFolder);
+  const stats = await fs.stat(fullPath);
+  
+  if (stats.isDirectory()) {
+    await fs.symlink(
+      fullPath,
+      path.join(tempStylesDir, styleFolder),
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
+  }
+}
+```
+
+**Source**: `app/api/lint/route.ts:49-68`
+
+<Info>
+Symlinks are used instead of copying files to improve performance and reduce disk I/O. On Windows, junction symlinks are used for directory compatibility.
+</Info>
+
+## Vale Configuration
+
+### Dynamic .vale.ini Generation
+
+For each request, the API generates a custom `.vale.ini` configuration:
+
+```typescript
+let basedOnStyles = style; // e.g., "Google"
+
+if (customRules && customRules.length > 0) {
+  basedOnStyles = `${style}, Custom`;
+}
+
+const valeIni = `
+StylesPath = ${tempStylesDir}
+MinAlertLevel = suggestion
+[*.md]
+BasedOnStyles = ${basedOnStyles}
+`;
+
+const iniFile = path.join(tmpDir, '.vale.ini');
+await fs.writeFile(iniFile, valeIni);
+```
+
+**Source**: `app/api/lint/route.ts:70-107`
+
+### Configuration Breakdown
+
+<ParamField path="StylesPath" type="string">
+  Points to the temporary styles directory containing style guides
+</ParamField>
+
+<ParamField path="MinAlertLevel" type="string">
+  Minimum severity level to report
+  
+  **Value**: `suggestion` (reports all levels: error, warning, suggestion)
+</ParamField>
+
+<ParamField path="[*.md]" type="section">
+  File pattern selector - applies to all markdown files
+</ParamField>
+
+<ParamField path="BasedOnStyles" type="string">
+  Comma-separated list of style guides to apply
+  
+  **Examples**:
+  - `"Google"` - Only Google style guide
+  - `"Google, Custom"` - Google + user's custom rules
+</ParamField>
+
+## Custom Rules Processing
+
+### Custom Style Directory
+
+When custom rules are provided, the API creates a `Custom` style:
+
+```typescript
+const customStyleDir = path.join(tempStylesDir, 'Custom');
+await fs.mkdir(customStyleDir, { recursive: true });
+
+// Create meta.json for Vale recognition
+await fs.writeFile(
+  path.join(customStyleDir, 'meta.json'),
+  JSON.stringify({
+    name: 'Custom',
+    description: 'User-uploaded rules',
+    feed: ''
+  })
+);
+```
+
+**Source**: `app/api/lint/route.ts:73-81`
+
+### Rule Name Sanitization
+
+Rule names are sanitized to prevent path traversal attacks:
+
+```typescript
+for (const rule of customRules) {
+  if (rule.name && rule.content) {
+    // Ensure .yml extension
+    const ruleName = rule.name.endsWith('.yml') 
+      ? rule.name 
+      : `${rule.name}.yml`;
+    
+    // Normalize and sanitize
+    const baseName = path.basename(ruleName);
+    const safeRuleName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    
+    // Skip invalid names
+    if (!safeRuleName || safeRuleName === '.' || safeRuleName === '..') {
+      continue;
+    }
+    
+    await fs.writeFile(
+      path.join(customStyleDir, safeRuleName),
+      rule.content
+    );
+  }
+}
+```
+
+**Source**: `app/api/lint/route.ts:83-95`
+
+<Warning>
+**Security**: Rule names are sanitized using `path.basename()` and regex filtering to prevent directory traversal attacks like `../../etc/passwd`.
+</Warning>
+
+## Vale Execution
+
+### Command Execution
+
+Vale is executed using Node.js's `execFile` API:
+
+```typescript
+const { stdout } = await execFileAsync(
+  valePath,
+  [`--config=${iniFile}`, '--output=JSON', tmpFile]
+);
+
+const results = JSON.parse(stdout);
+return NextResponse.json(results[tmpFile] || []);
+```
+
+**Source**: `app/api/lint/route.ts:121-123`
+
+### Command Arguments
+
+<ParamField path="--config" type="string">
+  Path to the temporary `.vale.ini` configuration file
+  
+  **Example**: `--config=/tmp/vale-abc123/.vale.ini`
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Output format specification
+  
+  **Value**: `JSON` (structured output for programmatic parsing)
+</ParamField>
+
+<ParamField path="file" type="string">
+  Path to the document file to lint
+  
+  **Example**: `/tmp/vale-abc123/doc.md`
+</ParamField>
+
+### Exit Code Handling
+
+Vale returns a non-zero exit code when it finds linting alerts. The API handles this gracefully:
+
+```typescript
+try {
+  const { stdout } = await execFileAsync(valePath, [
+    `--config=${iniFile}`,
+    '--output=JSON',
+    tmpFile
+  ]);
+  const results = JSON.parse(stdout);
+  return NextResponse.json(results[tmpFile] || []);
+} catch (error: unknown) {
+  // Vale returns non-zero exit code if it finds any alerts
+  const execError = error as { stdout?: string; message?: string };
+  
+  if (execError.stdout) {
+    try {
+      const results = JSON.parse(execError.stdout);
+      return NextResponse.json(results[tmpFile] || []);
+    } catch {
+      return NextResponse.json(
+        { error: 'Failed to parse Vale output' },
+        { status: 500 }
+      );
+    }
+  }
+  
+  console.error('Vale execution failed:', execError.message || execError);
+  return NextResponse.json(
+    { error: 'Vale execution failed' },
+    { status: 500 }
+  );
+}
+```
+
+**Source**: `app/api/lint/route.ts:119-137`
+
+<Info>
+This is expected behavior: Vale uses exit codes to indicate whether issues were found. The API checks `stdout` regardless of exit code to retrieve results.
+</Info>
+
+## Cleanup Process
+
+### Automatic Cleanup
+
+The API uses a `finally` block to ensure cleanup occurs even if errors happen:
+
+```typescript
+try {
+  // Vale execution...
+} catch (error) {
+  // Error handling...
+} finally {
+  // Clean up temporary files
+  try {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  } catch (rmError) {
+    console.error('Failed to remove temp directory:', rmError);
+  }
+}
+```
+
+**Source**: `app/api/lint/route.ts:138-144`
+
+### Cleanup Strategy
+
+- **Recursive Deletion**: Removes entire temporary directory and all contents
+- **Force Flag**: Ignores errors if files don't exist
+- **Error Logging**: Logs cleanup failures without throwing errors
+- **Non-Blocking**: Cleanup failures don't affect the response to the client
+
+<Warning>
+In serverless environments with ephemeral filesystems, cleanup is still important to free resources during function execution. Tmp directories persist for the function's lifetime.
+</Warning>
+
+## Vale Output Format
+
+### JSON Structure
+
+Vale outputs JSON with file paths as keys:
+
+```json
+{
+  "/tmp/vale-abc123/doc.md": [
+    {
+      "Action": { "Name": "replace", "Params": ["use"] },
+      "Span": [14, 21],
+      "Check": "Google.WordList",
+      "Description": "Use simple words",
+      "Link": "https://developers.google.com/style/word-list#utilize",
+      "Message": "Use 'use' instead of 'utilize'.",
+      "Severity": "warning",
+      "Match": "utilize",
+      "Line": 1
+    }
+  ]
+}
+```
+
+The API extracts the array for the temporary file path:
+
+```typescript
+const results = JSON.parse(stdout);
+return NextResponse.json(results[tmpFile] || []);
+```
+
+## Style Guide Structure
+
+Built-in style guides are stored in the `styles/` directory:
+
+```
+styles/
+├── Google/
+│   ├── meta.json
+│   ├── Acronyms.yml
+│   ├── Contractions.yml
+│   ├── Headings.yml
+│   ├── Parens.yml
+│   ├── Passive.yml
+│   ├── Semicolons.yml
+│   ├── Spelling.yml
+│   └── WordList.yml
+├── Microsoft/
+│   ├── meta.json
+│   └── *.yml
+└── RedHat/
+    ├── meta.json
+    └── *.yml
+```
+
+Each style guide contains:
+- **meta.json**: Metadata about the style guide
+- ***.yml**: Individual rule files
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="Symlink Performance" icon="link">
+    Symlinking styles is ~10x faster than copying files
+  </Card>
+  <Card title="Temp Directory" icon="folder">
+    Created in OS temp directory for optimal I/O performance
+  </Card>
+  <Card title="JSON Parsing" icon="brackets-curly">
+    Structured output eliminates need for text parsing
+  </Card>
+  <Card title="Parallel Execution" icon="arrows-split-up-and-left">
+    Vale execution doesn't block Node.js event loop
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Vale Binary Not Found
+
+**Symptom**: `Error: spawn vale ENOENT`
+
+**Solution**:
+```bash
+node scripts/install-vale.js
+vale --version  # Verify installation
+```
+
+### Style Guide Not Loading
+
+**Symptom**: `Error: Could not find style 'Google'`
+
+**Solution**: Verify styles directory exists and contains style folders:
+```bash
+ls -la styles/
+# Should show Google/, Microsoft/, RedHat/
+```
+
+### Permission Errors
+
+**Symptom**: `Error: EACCES: permission denied`
+
+**Solution**: The API automatically sets permissions, but you can manually verify:
+```bash
+chmod +x vale  # Make Vale executable
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="POST /api/lint" icon="arrow-right" href="/api-reference/lint">
+    Full API endpoint documentation
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/api-reference/error-handling">
+    Learn about error codes and handling strategies
+  </Card>
+</CardGroup>

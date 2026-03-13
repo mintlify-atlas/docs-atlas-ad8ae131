@@ -1,0 +1,622 @@
+---
+title: 'Configuration'
+description: 'Environment variables, Vale configuration, and customization options for Verbalize'
+---
+
+## Overview
+
+Verbalize can be customized through environment variables, Vale configuration files, and runtime settings. This guide covers all configuration options available for both local development and production deployments.
+
+## Environment Variables
+
+Verbalize operates with sensible defaults and minimal required configuration. All environment variables are optional.
+
+### Application Configuration
+
+<ParamField path="MAX_INPUT_SIZE" type="number" default="1048576">
+  Maximum text input size in bytes (default: 1MB). Increase for larger documents, but be mindful of function timeout limits.
+
+  ```bash
+  MAX_INPUT_SIZE=2097152  # 2MB
+  ```
+</ParamField>
+
+<ParamField path="NODE_ENV" type="string" default="development">
+  Node.js environment mode. Automatically set by Next.js.
+
+  ```bash
+  NODE_ENV=production
+  ```
+</ParamField>
+
+<ParamField path="PORT" type="number" default="3000">
+  Port for the development server (local only).
+
+  ```bash
+  PORT=3001
+  ```
+</ParamField>
+
+### Vale Configuration Paths
+
+<ParamField path="VALE_CONFIG_PATH" type="string" default="./.vale.ini">
+  Path to the Vale configuration file. Rarely needs to be changed.
+
+  ```bash
+  VALE_CONFIG_PATH=/custom/path/.vale.ini
+  ```
+</ParamField>
+
+<ParamField path="VALE_STYLES_PATH" type="string" default="./styles">
+  Path to the Vale styles directory containing style guide rules.
+
+  ```bash
+  VALE_STYLES_PATH=/custom/path/styles
+  ```
+</ParamField>
+
+### Debug Settings
+
+<ParamField path="DEBUG" type="string" default="">
+  Enable debug logging for Vale operations.
+
+  ```bash
+  DEBUG=vale:*
+  ```
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_DEBUG" type="boolean" default="false">
+  Enable client-side debug logging.
+
+  ```bash
+  NEXT_PUBLIC_DEBUG=true
+  ```
+</ParamField>
+
+### Environment File Setup
+
+<Tabs>
+  <Tab title="Local Development">
+    Create a `.env.local` file in the project root:
+
+    ```bash .env.local
+    # Maximum input size (2MB)
+    MAX_INPUT_SIZE=2097152
+
+    # Enable debug logging
+    DEBUG=vale:*
+    NEXT_PUBLIC_DEBUG=true
+
+    # Custom Vale paths (if needed)
+    # VALE_CONFIG_PATH=./.vale.ini
+    # VALE_STYLES_PATH=./styles
+    ```
+
+    <Warning>
+      Never commit `.env.local` to version control. It's already included in `.gitignore`.
+    </Warning>
+  </Tab>
+
+  <Tab title="Netlify Production">
+    Set environment variables in the Netlify dashboard:
+
+    1. Navigate to **Site settings** → **Environment variables**
+    2. Click **Add a variable**
+    3. Add key-value pairs:
+
+    | Key | Value | Scope |
+    |-----|-------|-------|
+    | `MAX_INPUT_SIZE` | `2097152` | All deploys |
+    | `DEBUG` | `vale:*` | Deploy previews only |
+
+    <Tip>
+      Use different values for production vs. deploy previews by setting the **Scope** appropriately.
+    </Tip>
+  </Tab>
+
+  <Tab title="Other Platforms">
+    For deployments to Vercel, AWS, or other platforms:
+
+    <CodeGroup>
+      ```bash Vercel
+      # In Vercel dashboard: Settings → Environment Variables
+      MAX_INPUT_SIZE=2097152
+      DEBUG=vale:*
+      ```
+
+      ```bash Docker
+      # In docker-compose.yml or Dockerfile
+      environment:
+        - MAX_INPUT_SIZE=2097152
+        - DEBUG=vale:*
+      ```
+
+      ```bash Systemd
+      # In systemd service file
+      Environment="MAX_INPUT_SIZE=2097152"
+      Environment="DEBUG=vale:*"
+      ```
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Vale Configuration
+
+Vale is configured via the `.vale.ini` file in the project root.
+
+### Default Configuration
+
+```ini .vale.ini
+StylesPath = styles
+MinAlertLevel = suggestion
+
+Packages = Google, Microsoft, RedHat
+
+[*.md]
+BasedOnStyles = Vale, Google, Microsoft, RedHat
+```
+
+<ParamField path="StylesPath" type="string" default="styles">
+  Directory containing Vale style guides. This should point to the `styles/` folder with Google, Microsoft, and RedHat directories.
+</ParamField>
+
+<ParamField path="MinAlertLevel" type="enum" default="suggestion">
+  Minimum severity level for alerts. Options:
+  - `suggestion`: Show all alerts (recommended)
+  - `warning`: Show warnings and errors only
+  - `error`: Show only errors
+</ParamField>
+
+<ParamField path="Packages" type="string">
+  Comma-separated list of style guide packages to use. Available packages:
+  - `Google`: Google Developer Documentation Style Guide
+  - `Microsoft`: Microsoft Writing Style Guide
+  - `RedHat`: Red Hat Documentation Style Guide
+</ParamField>
+
+<ParamField path="BasedOnStyles" type="string">
+  Style guides to apply to specific file types. The `[*.md]` section applies to all Markdown files.
+</ParamField>
+
+### Customizing Vale Configuration
+
+<Tabs>
+  <Tab title="Change Alert Level">
+    To show only warnings and errors (hide suggestions):
+
+    ```ini .vale.ini
+    StylesPath = styles
+    MinAlertLevel = warning  # Changed from 'suggestion'
+
+    Packages = Google, Microsoft, RedHat
+
+    [*.md]
+    BasedOnStyles = Vale, Google, Microsoft, RedHat
+    ```
+  </Tab>
+
+  <Tab title="Use Single Style Guide">
+    To lint against only one style guide (e.g., Google):
+
+    ```ini .vale.ini
+    StylesPath = styles
+    MinAlertLevel = suggestion
+
+    Packages = Google  # Only Google
+
+    [*.md]
+    BasedOnStyles = Vale, Google  # Only apply Google rules
+    ```
+
+    <Note>
+      You'll also need to update the UI to remove other style guide options.
+    </Note>
+  </Tab>
+
+  <Tab title="Add Custom Rules">
+    Create custom rules in a `Custom` style directory:
+
+    <Steps>
+      <Step title="Create Custom Style Directory">
+        ```bash
+        mkdir -p styles/Custom
+        ```
+      </Step>
+
+      <Step title="Add meta.json">
+        ```json styles/Custom/meta.json
+        {
+          "name": "Custom",
+          "description": "Custom style rules for your organization",
+          "feed": ""
+        }
+        ```
+      </Step>
+
+      <Step title="Create a Rule">
+        ```yaml styles/Custom/Acronyms.yml
+        extends: substitution
+        message: "Use '%s' instead of '%s'"
+        level: warning
+        ignorecase: false
+        swap:
+          API's: API
+          APIs: APIs
+          e-mail: email
+          E-mail: Email
+        ```
+      </Step>
+
+      <Step title="Update .vale.ini">
+        ```ini .vale.ini
+        StylesPath = styles
+        MinAlertLevel = suggestion
+
+        Packages = Google, Microsoft, RedHat
+
+        [*.md]
+        BasedOnStyles = Vale, Google, Microsoft, RedHat, Custom
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="File-Type Specific Rules">
+    Apply different rules to different file types:
+
+    ```ini .vale.ini
+    StylesPath = styles
+    MinAlertLevel = suggestion
+
+    Packages = Google, Microsoft, RedHat
+
+    [*.md]
+    BasedOnStyles = Vale, Google, Microsoft, RedHat
+
+    [*.{txt,text}]
+    BasedOnStyles = Vale, Microsoft
+
+    [*.{rst,rest}]
+    BasedOnStyles = Vale, Google
+    ```
+  </Tab>
+</Tabs>
+
+## Style Guide Structure
+
+Vale style guides are organized in directories under `styles/`:
+
+```
+styles/
+├── Google/
+│   ├── meta.json                 # Style guide metadata
+│   ├── Acronyms.yml             # Acronym rules
+│   ├── Contractions.yml         # Contraction usage rules
+│   ├── Headings.yml             # Heading format rules
+│   ├── Parens.yml               # Parentheses usage
+│   ├── Passive.yml              # Passive voice detection
+│   ├── Spelling.yml             # Spelling conventions
+│   └── WordList.yml             # Preferred terminology
+├── Microsoft/
+│   ├── meta.json
+│   ├── Accessibility.yml        # Accessibility guidelines
+│   ├── Adverbs.yml              # Adverb usage
+│   ├── Contractions.yml
+│   └── [...]
+└── RedHat/
+    ├── meta.json
+    ├── Abbreviations.yml
+    ├── CaseSensitiveTerms.yml
+    └── [...]
+```
+
+<Warning>
+  Do not manually edit the contents of `Google/`, `Microsoft/`, or `RedHat/` directories. These are maintained by their respective upstream repositories.
+</Warning>
+
+### Updating Style Guides
+
+To update to the latest versions of style guides:
+
+```bash
+# Using Vale's sync command
+vale sync
+```
+
+This downloads the latest versions of packages specified in `.vale.ini`.
+
+<Note>
+  Run `vale sync` periodically to keep style guides up to date with the latest writing conventions.
+</Note>
+
+## API Configuration
+
+The Vale API endpoint (`/app/api/lint/route.ts`) includes built-in security and validation:
+
+### Security Limits
+
+```typescript app/api/lint/route.ts
+const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+const MAX_TEXT_LENGTH = 1024 * 1024; // 1MB
+const MAX_CUSTOM_RULES = 10;
+const MAX_RULE_LENGTH = 10 * 1024; // 10KB
+```
+
+<AccordionGroup>
+  <Accordion title="ALLOWED_STYLES">
+    Whitelist of valid style guides to prevent configuration injection attacks.
+
+    **To add a new style:**
+    ```typescript
+    const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat', 'Custom'];
+    ```
+  </Accordion>
+
+  <Accordion title="MAX_TEXT_LENGTH">
+    Maximum input size for lint requests. Protects against memory exhaustion.
+
+    **To change:**
+    ```typescript
+    const MAX_TEXT_LENGTH = 2 * 1024 * 1024; // 2MB
+    ```
+
+    <Warning>
+      Increasing this value may cause timeout errors on serverless platforms with strict execution limits.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="MAX_CUSTOM_RULES">
+    Maximum number of custom rules allowed per request.
+
+    **To change:**
+    ```typescript
+    const MAX_CUSTOM_RULES = 20;
+    ```
+  </Accordion>
+
+  <Accordion title="MAX_RULE_LENGTH">
+    Maximum size of each custom rule.
+
+    **To change:**
+    ```typescript
+    const MAX_RULE_LENGTH = 20 * 1024; // 20KB
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### API Request Format
+
+The lint API expects POST requests with the following structure:
+
+```typescript Request Body
+{
+  text: string;           // Markdown content to lint (required)
+  style: string;          // Style guide: 'Google', 'Microsoft', or 'RedHat' (required)
+  customRules?: Array<{   // Optional custom rules
+    name: string;         // Rule filename (e.g., 'Acronyms.yml')
+    content: string;      // YAML rule definition
+  }>;
+}
+```
+
+<CodeGroup>
+  ```typescript Example Request
+  const response = await fetch('/api/lint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: 'Your documentation content here.',
+      style: 'Google',
+      customRules: [
+        {
+          name: 'Acronyms.yml',
+          content: `
+extends: substitution
+message: "Use '%s' instead of '%s'"
+level: warning
+swap:
+  API's: API
+`
+        }
+      ]
+    })
+  });
+
+  const results = await response.json();
+  ```
+
+  ```json Example Response
+  [
+    {
+      "Line": 1,
+      "Column": 5,
+      "Severity": "warning",
+      "Message": "Use 'use' instead of 'utilize'",
+      "Rule": "Google.WordList",
+      "Replacement": "use"
+    },
+    {
+      "Line": 3,
+      "Column": 12,
+      "Severity": "suggestion",
+      "Message": "Consider avoiding passive voice",
+      "Rule": "Google.Passive"
+    }
+  ]
+  ```
+</CodeGroup>
+
+## Performance Tuning
+
+### Optimizing for Large Documents
+
+<Steps>
+  <Step title="Increase Function Timeout">
+    In `netlify.toml`:
+
+    ```toml netlify.toml
+    [functions]
+      timeout = 30  # Increase from default 10 seconds
+      included_files = ["vale", "styles/**"]
+    ```
+  </Step>
+
+  <Step title="Reduce Active Style Guides">
+    Disable unused style guides in `.vale.ini`:
+
+    ```ini .vale.ini
+    # Only use one style guide for faster processing
+    [*.md]
+    BasedOnStyles = Vale, Google
+    ```
+  </Step>
+
+  <Step title="Implement Client-Side Chunking">
+    For documents exceeding 50KB, consider splitting into smaller chunks on the client side before sending to the API.
+  </Step>
+</Steps>
+
+### Cold Start Optimization
+
+Serverless functions experience cold starts after inactivity. Mitigate by:
+
+1. **Function Warming**: Periodic ping requests to keep functions warm
+   ```javascript
+   // In a cron job or scheduled function
+   await fetch('https://your-site.netlify.app/api/lint', {
+     method: 'POST',
+     body: JSON.stringify({ text: 'warmup', style: 'Google' })
+   });
+   ```
+
+2. **Minimal Binary Size**: Ensure only necessary files are bundled:
+   ```toml netlify.toml
+   [functions]
+     included_files = ["vale", "styles/Google/**", "styles/Microsoft/**", "styles/RedHat/**"]
+   ```
+
+3. **Use Netlify Edge Functions** (experimental): Deploy functions closer to users for faster response times
+
+## Monitoring Configuration
+
+### Function Logs
+
+Access logs in the Netlify dashboard under **Functions** → **[Function Name]** → **Logs**.
+
+Example log entries:
+
+```bash
+START RequestId: abc123-def456-ghi789
+Vale execution started for style: Google
+Vale execution completed successfully in 234ms
+END RequestId: abc123-def456-ghi789
+REPORT Duration: 234.56 ms  Billed Duration: 300 ms  Memory Size: 1024 MB  Max Memory Used: 145 MB
+```
+
+### Error Tracking
+
+Implement error tracking with services like Sentry:
+
+<Steps>
+  <Step title="Install Sentry">
+    ```bash
+    npm install @sentry/nextjs
+    ```
+  </Step>
+
+  <Step title="Configure Sentry">
+    Create `sentry.server.config.ts`:
+
+    ```typescript sentry.server.config.ts
+    import * as Sentry from "@sentry/nextjs";
+
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV,
+      tracesSampleRate: 1.0,
+    });
+    ```
+  </Step>
+
+  <Step title="Add Environment Variable">
+    In Netlify: **Site settings** → **Environment variables**
+
+    ```bash
+    SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+    ```
+  </Step>
+</Steps>
+
+## Backup and Version Control
+
+<Warning>
+  Always commit configuration changes to version control before deploying to production.
+</Warning>
+
+### Files to Track
+
+```bash
+# Essential configuration files
+.vale.ini                # Vale configuration
+netlify.toml             # Netlify deployment settings
+next.config.ts           # Next.js configuration
+package.json             # Dependencies and scripts
+.env.example             # Example environment variables (no secrets)
+
+# Style guides (optional)
+styles/Google/**
+styles/Microsoft/**
+styles/RedHat/**
+styles/Custom/**         # Custom rules only
+```
+
+### Files to Exclude
+
+```bash .gitignore
+# Local environment variables (contains secrets)
+.env.local
+.env.development.local
+.env.production.local
+
+# Build outputs
+.next/
+out/
+build/
+
+# Vale binary (downloaded during install)
+vale
+vale.exe
+
+# Node modules
+node_modules/
+```
+
+## Configuration Checklist
+
+Before deploying to production:
+
+- [ ] `.vale.ini` configured with desired style guides
+- [ ] `netlify.toml` includes Vale binary and styles in `included_files`
+- [ ] Environment variables set in Netlify dashboard (if needed)
+- [ ] Function timeout adjusted for expected document sizes
+- [ ] Custom style guides committed to repository
+- [ ] `.env.local` not committed to version control
+- [ ] Vale binary version documented (currently 3.9.5)
+- [ ] All configuration files tested locally with `npm run build`
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Setup" icon="laptop" href="/deployment/setup">
+    Return to local development setup guide
+  </Card>
+  <Card title="Netlify Deployment" icon="rocket" href="/deployment/netlify">
+    Review Netlify deployment instructions
+  </Card>
+  <Card title="Vale Documentation" icon="book" href="https://vale.sh/docs/">
+    Learn more about Vale configuration options
+  </Card>
+  <Card title="Custom Rules" icon="code" href="https://vale.sh/docs/topics/styles/">
+    Create custom Vale style rules
+  </Card>
+</CardGroup>

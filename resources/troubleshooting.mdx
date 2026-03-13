@@ -1,0 +1,370 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for Verbalize deployment and operation"
+---
+
+## Common Issues
+
+This guide covers the most frequently encountered issues when deploying and running Verbalize, with step-by-step solutions.
+
+<AccordionGroup>
+  <Accordion title="Vale binary not found">
+    **Symptoms:**
+    ```bash
+    Error: spawn vale ENOENT
+    ```
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Install Vale manually">
+        Run the installation script:
+        ```bash
+        node scripts/install-vale.js
+        ```
+      </Step>
+      
+      <Step title="Add Vale to system PATH">
+        ```bash
+        export PATH="$PATH:/path/to/vale"
+        ```
+      </Step>
+      
+      <Step title="Verify installation">
+        ```bash
+        vale --version
+        ```
+      </Step>
+    </Steps>
+
+    **Netlify-specific fix:**
+    
+    Ensure Vale binary is included in your deployment by verifying `scripts/install-vale.js` runs during the build:
+
+    ```json package.json
+    {
+      "scripts": {
+        "postinstall": "node scripts/install-vale.js"
+      }
+    }
+    ```
+
+    Check file permissions in your build settings:
+    ```bash
+    chmod +x vale
+    ```
+  </Accordion>
+
+  <Accordion title="Style guide not loading">
+    **Symptoms:**
+    ```bash
+    Error: Could not find style 'Google'
+    ```
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Verify .vale.ini configuration">
+        Check your `.vale.ini` file:
+        ```ini .vale.ini
+        StylesPath = styles
+        [*.md]
+        BasedOnStyles = Google, Microsoft
+        ```
+      </Step>
+      
+      <Step title="Ensure styles directory exists">
+        ```bash
+        ls -la styles/
+        # Should show Google/, Microsoft/, RedHat/ directories
+        ```
+      </Step>
+      
+      <Step title="Re-sync style guides">
+        If styles are missing:
+        ```bash
+        vale sync
+        ```
+      </Step>
+    </Steps>
+
+    **Deployment consideration:**
+    
+    Make sure the `styles/` directory is included in your git repository and not excluded by `.gitignore`.
+  </Accordion>
+
+  <Accordion title="TypeScript compilation errors">
+    **Symptoms:**
+    ```bash
+    Type 'X' is not assignable to type 'Y'
+    ```
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Check tsconfig.json path aliases">
+        ```json tsconfig.json
+        {
+          "compilerOptions": {
+            "paths": {
+              "@/*": ["./*"]
+            }
+          }
+        }
+        ```
+      </Step>
+      
+      <Step title="Verify interface definitions">
+        Ensure TypeScript interfaces in `app/page.tsx` match your usage:
+        ```typescript
+        interface ValeAlert {
+          Check: string;
+          Description: string;
+          Link: string;
+          Message: string;
+          Severity: string;
+          Match: string;
+          Line: number;
+          Span: [number, number];
+          Action: {
+            Name: string;
+            Params: string[] | null;
+          };
+        }
+        ```
+      </Step>
+      
+      <Step title="Run type check">
+        ```bash
+        npm run build
+        ```
+      </Step>
+    </Steps>
+  </Accordion>
+
+  <Accordion title="API timeout errors">
+    **Symptoms:**
+    ```bash
+    Error: Request timeout after 10 seconds
+    ```
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Reduce document size">
+        Keep documents under 50KB for optimal performance. The maximum allowed size is 1MB (`MAX_TEXT_LENGTH = 1024 * 1024`).
+      </Step>
+      
+      <Step title="Disable unused style guides">
+        In `.vale.ini`, only enable the style guides you need:
+        ```ini
+        [*.md]
+        BasedOnStyles = Google
+        ```
+      </Step>
+      
+      <Step title="Increase timeout in netlify.toml">
+        ```toml netlify.toml
+        [functions]
+          timeout = 30
+        ```
+      </Step>
+    </Steps>
+
+    **Performance impact:**
+    
+    Enabling all three style guides simultaneously increases processing time by approximately 40%. See [Configuration](/deployment/configuration#performance-tuning) for optimization tips.
+  </Accordion>
+
+  <Accordion title="Playwright tests failing">
+    **Symptoms:**
+    ```bash
+    Error: Page did not load within 30 seconds
+    ```
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Update Playwright browsers">
+        ```bash
+        npx playwright install
+        ```
+      </Step>
+      
+      <Step title="Run tests with debug mode">
+        ```bash
+        npx playwright test --debug
+        ```
+      </Step>
+      
+      <Step title="Check if dev server is running">
+        Ensure the development server is active:
+        ```bash
+        npm run dev
+        ```
+        
+        Tests expect the app to be available at `http://localhost:3000`.
+      </Step>
+    </Steps>
+  </Accordion>
+
+  <Accordion title="Custom rules not being applied">
+    **Symptoms:**
+    Custom Vale rules uploaded through the UI don't appear in linting results.
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Verify rule format">
+        Ensure your rule file has the `.yml` extension and follows Vale's syntax:
+        ```yaml CustomRule.yml
+        extends: existence
+        message: "Use '%s' instead of '%s'"
+        level: error
+        ignorecase: false
+        tokens:
+          - tech writer
+        ```
+      </Step>
+      
+      <Step title="Check rule file size">
+        Maximum rule size is 10KB (`MAX_RULE_LENGTH = 10 * 1024`). Larger files will be rejected by the API.
+      </Step>
+      
+      <Step title="Verify API response">
+        Check browser DevTools console for API errors:
+        ```javascript
+        // Expected: 200 OK
+        // Error: 400 Bad Request with error message
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+    Custom rules are processed server-side with path traversal sanitization. Rule names are normalized to prevent security issues (`app/api/lint/route.ts:88-93`).
+    </Note>
+  </Accordion>
+
+  <Accordion title="Dark mode not persisting">
+    **Symptoms:**
+    Theme preference resets after page reload.
+
+    **Resolution:**
+
+    <Steps>
+      <Step title="Check browser localStorage">
+        Open DevTools → Application → Local Storage and verify the `theme` key exists.
+      </Step>
+      
+      <Step title="Verify next-themes configuration">
+        In `app/layout.tsx`, ensure the ThemeProvider is configured:
+        ```typescript
+        <ThemeProvider attribute="class" defaultTheme="system">
+          {children}
+        </ThemeProvider>
+        ```
+      </Step>
+      
+      <Step title="Clear browser cache">
+        Sometimes cached assets can interfere with theme switching.
+      </Step>
+    </Steps>
+  </Accordion>
+</AccordionGroup>
+
+## Debug Mode
+
+To enable verbose logging for troubleshooting:
+
+<CodeGroup>
+
+```bash Development
+DEBUG=vale:* npm run dev
+```
+
+```bash .env.local
+NEXT_PUBLIC_DEBUG=true
+```
+
+</CodeGroup>
+
+## Log Locations
+
+<CardGroup cols={3}>
+  <Card title="Development Logs" icon="terminal">
+    Console output during `npm run dev`
+  </Card>
+  <Card title="Production Logs" icon="server">
+    Netlify Functions logs in dashboard
+  </Card>
+  <Card title="Test Logs" icon="flask">
+    `test-results/` directory after Playwright execution
+  </Card>
+</CardGroup>
+
+## Performance Troubleshooting
+
+### Large Files
+
+Documents exceeding 100,000 characters may require optimization:
+
+```typescript app/api/lint/route.ts
+// Current limit
+const MAX_TEXT_LENGTH = 1024 * 1024; // 1MB
+```
+
+**Solutions:**
+- Break large documents into smaller sections
+- Process documents in chunks
+- Consider implementing streaming for very large files
+
+### Multiple Style Guides
+
+Enabling all style guides simultaneously increases processing time:
+
+| Style Guides | Average Processing Time |
+|--------------|------------------------|
+| Single (Google) | ~500ms |
+| Two (Google + Microsoft) | ~700ms |
+| Three (All) | ~1000ms (+40%) |
+
+**Optimization:**
+```ini .vale.ini
+# Only enable what you need
+[*.md]
+BasedOnStyles = Google
+```
+
+### Cold Starts
+
+First request after deployment may take 3-5 seconds due to Vale initialization:
+
+```toml netlify.toml
+[functions]
+  # Keep functions warm with periodic pings
+  node_bundler = "esbuild"
+```
+
+## Getting Help
+
+If you encounter issues not covered here:
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/mtgr18977/verbalize/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Vale Documentation" icon="book" href="https://vale.sh/docs/">
+    Learn more about Vale CLI
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="FAQ" icon="question" href="/resources/faq">
+    Frequently asked questions
+  </Card>
+  <Card title="Configuration Guide" icon="gear" href="/deployment/configuration">
+    Detailed configuration options
+  </Card>
+</CardGroup>

@@ -1,0 +1,511 @@
+---
+title: 'Style Guides'
+description: 'Choose from Google, Microsoft, and Red Hat style guides for automated documentation linting'
+icon: 'book'
+---
+
+## Overview
+
+Verbalize includes three industry-standard style guides powered by Vale CLI. Each style guide enforces specific rules for technical writing, helping you maintain consistency and clarity across your documentation.
+
+<CardGroup cols={3}>
+  <Card title="Google Developer" icon="google">
+    Developer-focused style emphasizing clarity and active voice
+  </Card>
+  <Card title="Microsoft Writing" icon="microsoft">
+    Enterprise technical documentation with strict conventions
+  </Card>
+  <Card title="Red Hat" icon="redhat">
+    Open source documentation with inclusive language guidelines
+  </Card>
+</CardGroup>
+
+## Style Guide Selection
+
+Select your base style guide from the sidebar dropdown:
+
+```typescript
+// From app/page.tsx:213-221
+<select
+  value={style}
+  onChange={(e) => setStyle(e.target.value)}
+  className="w-full p-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer text-sm font-semibold text-gray-900 dark:text-gray-100"
+>
+  <option value="Google">Google Developer</option>
+  <option value="Microsoft">Microsoft Writing</option>
+  <option value="RedHat">Red Hat Style</option>
+</select>
+```
+
+The selected style guide applies to all linting operations until changed.
+
+## Vale Configuration
+
+Style guides are configured in `.vale.ini`:
+
+```ini
+StylesPath = styles
+MinAlertLevel = suggestion
+
+Packages = Google, Microsoft, RedHat
+
+[*.md]
+BasedOnStyles = Vale, Google, Microsoft, RedHat
+```
+
+<Info>
+**Alert Levels Explained:**
+- `suggestion` - Minor improvements (blue badge)
+- `warning` - Issues that should be addressed (yellow badge)
+- `error` - Critical violations requiring fixes (red badge)
+</Info>
+
+## Style Guide Validation
+
+The API endpoint validates style guide selection before linting:
+
+```typescript
+// From app/api/lint/route.ts:10-11, 29-31
+const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+
+if (!ALLOWED_STYLES.includes(style)) {
+  return NextResponse.json({ error: 'Invalid style guide selected' }, { status: 400 });
+}
+```
+
+This whitelist prevents configuration injection attacks and ensures only supported style guides are used.
+
+## Google Developer Style Guide
+
+**Source:** [Google Developer Documentation Style Guide](https://developers.google.com/style)
+
+### Philosophy
+
+Emphasizes clarity, active voice, and developer-friendly language. Optimized for technical audiences who value conciseness and precision.
+
+### Example Rules
+
+<Tabs>
+  <Tab title="Passive Voice">
+    **Rule:** `Google.Passive`
+
+    Detects passive voice constructions and suggests active alternatives:
+
+    ```yaml
+    extends: existence
+    link: 'https://developers.google.com/style/voice'
+    message: "In general, use active voice instead of passive voice ('%s')."
+    ignorecase: true
+    level: suggestion
+    raw:
+      - \b(am|are|were|being|is|been|was|be)\b\s*
+    tokens:
+      - '[\w]+ed'
+      - awoken
+      - beaten
+      - become
+      # ... 180+ past participles
+    ```
+
+    **Example:**
+    - ❌ "The API was called by the client"
+    - ✅ "The client called the API"
+  </Tab>
+  <Tab title="First Person">
+    **Rule:** `Google.FirstPerson`
+
+    Discourages first-person pronouns in technical documentation:
+
+    ```yaml
+    extends: existence
+    message: Avoid first-person pronouns such as '%s'.
+    level: warning
+    tokens:
+      - I
+      - I'm
+      - me
+      - my
+      - we
+      - we're
+      - us
+      - our
+    ```
+
+    **Example:**
+    - ❌ "We recommend using the latest version"
+    - ✅ "Use the latest version"
+  </Tab>
+  <Tab title="Headings">
+    **Rule:** `Google.Headings`
+
+    Enforces consistent heading structure:
+
+    ```yaml
+    extends: capitalization
+    message: "'%s' should use sentence-style capitalization."
+    level: warning
+    scope: heading
+    match: $sentence
+    ```
+
+    **Example:**
+    - ❌ `## Getting Started With The API`
+    - ✅ `## Getting started with the API`
+  </Tab>
+  <Tab title="Slang">
+    **Rule:** `Google.Slang`
+
+    Flags informal language inappropriate for technical docs:
+
+    ```yaml
+    extends: existence
+    message: "Avoid using slang ('%s')."
+    level: error
+    tokens:
+      - albeit
+      - tons of
+      - oops
+      - apropos
+    ```
+
+    **Example:**
+    - ❌ "This feature has tons of configuration options"
+    - ✅ "This feature has many configuration options"
+  </Tab>
+</Tabs>
+
+### Key Focus Areas
+
+- Active voice over passive voice
+- Sentence-style capitalization in headings
+- No first-person pronouns
+- Avoiding slang and informal language
+- Clear, concise sentences
+- Proper use of punctuation (semicolons, periods, quotes)
+
+## Microsoft Writing Style Guide
+
+**Source:** [Microsoft Writing Style Guide](https://learn.microsoft.com/style-guide)
+
+### Philosophy
+
+Focuses on conversational tone with contractions while maintaining professional clarity. Designed for global audiences with accessibility considerations.
+
+### Example Rules
+
+<Tabs>
+  <Tab title="Contractions">
+    **Rule:** `Microsoft.Contractions`
+
+    Enforces contractions to create conversational tone:
+
+    ```yaml
+    extends: substitution
+    message: "Use '%s' instead of '%s'."
+    link: https://docs.microsoft.com/en-us/style-guide/word-choice/use-contractions
+    level: error
+    ignorecase: true
+    action:
+      name: replace
+    swap:
+      are not: aren't
+      cannot: can't
+      could not: couldn't
+      did not: didn't
+      do not: don't
+      does not: doesn't
+      has not: hasn't
+      have not: haven't
+      is not: isn't
+      should not: shouldn't
+      was not: wasn't
+      were not: weren't
+      will not: won't
+    ```
+
+    **Example:**
+    - ❌ "The service does not support this feature"
+    - ✅ "The service doesn't support this feature"
+  </Tab>
+  <Tab title="Accessibility">
+    **Rule:** `Microsoft.Accessibility`
+
+    Ensures inclusive language for all users:
+
+    ```yaml
+    extends: substitution
+    message: "Use '%s' instead of '%s'."
+    level: error
+    swap:
+      abnormal: atypical
+      cripple: disable
+      crazy: unexpected
+      insane: illogical
+      normal user: typical user
+    ```
+
+    **Example:**
+    - ❌ "Click here to access the feature"
+    - ✅ "Select the Download button to access the feature"
+  </Tab>
+  <Tab title="Gender Bias">
+    **Rule:** `Microsoft.GenderBias`
+
+    Prevents gendered language:
+
+    ```yaml
+    extends: existence
+    message: "Use gender-neutral alternatives for '%s'."
+    level: error
+    tokens:
+      - he
+      - she
+      - his
+      - her
+      - him
+      - mankind
+      - man-hours
+    ```
+
+    **Example:**
+    - ❌ "Each developer must submit his code"
+    - ✅ "Each developer must submit their code"
+  </Tab>
+  <Tab title="Wordiness">
+    **Rule:** `Microsoft.Wordiness`
+
+    Reduces verbose phrases:
+
+    ```yaml
+    extends: substitution
+    message: "Consider using '%s' instead of '%s'."
+    level: warning
+    swap:
+      a number of: several
+      at this point in time: now
+      in order to: to
+      it is important to note that: note that
+    ```
+
+    **Example:**
+    - ❌ "At this point in time, the service is unavailable"
+    - ✅ "The service is currently unavailable"
+  </Tab>
+</Tabs>
+
+### Key Focus Areas
+
+- Conversational tone with contractions
+- Accessibility and inclusive language
+- Gender-neutral writing
+- Concise alternatives to wordy phrases
+- Consistent date and time formatting
+- Proper use of headings and punctuation
+
+## Red Hat Documentation Style
+
+**Source:** [Red Hat Documentation Style Guide](https://redhat-documentation.github.io/)
+
+### Philosophy
+
+Emphasizes open source community values with inclusive language guidelines. Focuses on sentence-style capitalization and consistent technical terminology.
+
+### Example Rules
+
+<Tabs>
+  <Tab title="Headings">
+    **Rule:** `RedHat.Headings`
+
+    Enforces sentence-style capitalization with extensive exceptions:
+
+    ```yaml
+    extends: capitalization
+    level: suggestion
+    link: https://redhat-documentation.github.io/vale-at-red-hat/reference-guide.html#headings
+    match: $sentence
+    message: "Use sentence-style capitalization in '%s'."
+    scope: heading
+    indicators:
+      - ":"
+    exceptions:
+      - API
+      - AWS
+      - Ansible
+      - Docker
+      - Kubernetes
+      - OpenShift
+      - PostgreSQL
+      - Red Hat
+      # ... 290+ proper nouns and acronyms
+    ```
+
+    **Example:**
+    - ❌ `## Deploying Applications On OpenShift`
+    - ✅ `## Deploying applications on OpenShift`
+  </Tab>
+  <Tab title="Conscious Language">
+    **Rule:** `RedHat.ConsciousLanguage`
+
+    Promotes inclusive terminology:
+
+    ```yaml
+    extends: substitution
+    message: "Use '%s' instead of '%s'."
+    level: error
+    swap:
+      master: primary
+      slave: secondary
+      blacklist: blocklist
+      whitelist: allowlist
+      sanity check: validation
+    ```
+
+    **Example:**
+    - ❌ "Add the domain to the whitelist"
+    - ✅ "Add the domain to the allowlist"
+  </Tab>
+  <Tab title="Passive Voice">
+    **Rule:** `RedHat.PassiveVoice`
+
+    Detects passive constructions:
+
+    ```yaml
+    extends: existence
+    message: "In general, use active voice instead of passive voice ('%s')."
+    level: suggestion
+    tokens:
+      - is being
+      - are being
+      - was being
+      - were being
+      - has been
+      - have been
+    ```
+
+    **Example:**
+    - ❌ "The configuration is being updated"
+    - ✅ "The system updates the configuration"
+  </Tab>
+  <Tab title="Case Sensitive Terms">
+    **Rule:** `RedHat.CaseSensitiveTerms`
+
+    Enforces proper capitalization of product names:
+
+    ```yaml
+    extends: substitution
+    message: "Use '%s' instead of '%s'."
+    level: error
+    swap:
+      ansible: Ansible
+      kubernetes: Kubernetes
+      openshift: OpenShift
+      postgresql: PostgreSQL
+    ```
+
+    **Example:**
+    - ❌ "Deploy to kubernetes cluster"
+    - ✅ "Deploy to Kubernetes cluster"
+  </Tab>
+</Tabs>
+
+### Key Focus Areas
+
+- Sentence-style capitalization in headings
+- Inclusive and conscious language
+- Proper capitalization of technical terms
+- Active voice preference
+- Consistent terminology
+- Oxford comma usage
+- Avoiding redundant terms
+
+## Style Directory Structure
+
+Style guides are stored in the `/styles` directory:
+
+```
+styles/
+├── Google/
+│   ├── Passive.yml
+│   ├── FirstPerson.yml
+│   ├── Headings.yml
+│   ├── Slang.yml
+│   └── ... (30+ rules)
+├── Microsoft/
+│   ├── Contractions.yml
+│   ├── Accessibility.yml
+│   ├── GenderBias.yml
+│   ├── Wordiness.yml
+│   └── ... (40+ rules)
+└── RedHat/
+    ├── Headings.yml
+    ├── ConsciousLanguage.yml
+    ├── CaseSensitiveTerms.yml
+    ├── PassiveVoice.yml
+    └── ... (35+ rules)
+```
+
+<Note>
+Each `.yml` file represents a single linting rule. Vale loads all rules from the selected style guide directory during linting operations.
+</Note>
+
+## Combining Style Guides
+
+You can combine the base style guide with custom rules:
+
+```typescript
+// From app/api/lint/route.ts:70-98
+let basedOnStyles = style;
+
+if (customRules && Array.isArray(customRules) && customRules.length > 0) {
+  const customStyleDir = path.join(tempStylesDir, 'Custom');
+  await fs.mkdir(customStyleDir, { recursive: true });
+
+  // Add a minimal meta.json for the Custom style
+  await fs.writeFile(path.join(customStyleDir, 'meta.json'), JSON.stringify({
+    name: 'Custom',
+    description: 'User-uploaded rules',
+    feed: ''
+  }));
+
+  for (const rule of customRules) {
+    if (rule.name && rule.content) {
+      const ruleName = rule.name.endsWith('.yml') ? rule.name : `${rule.name}.yml`;
+      const baseName = path.basename(ruleName);
+      const safeRuleName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      await fs.writeFile(path.join(customStyleDir, safeRuleName), rule.content);
+    }
+  }
+
+  basedOnStyles = `${style}, Custom`;
+}
+```
+
+This creates a temporary `Custom` style directory that combines with your selected base style guide.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Choose One Primary Guide" icon="star">
+    Select the style guide that matches your organization's standards rather than switching between guides
+  </Card>
+  <Card title="Review Rule Documentation" icon="book-open">
+    Click the external link icon on alerts to read the full style guide explanation for each rule
+  </Card>
+  <Card title="Address Errors First" icon="triangle-exclamation">
+    Fix red error-level alerts before addressing yellow warnings and blue suggestions
+  </Card>
+  <Card title="Use Custom Rules" icon="file-code">
+    Extend the base style guide with custom rules for organization-specific terminology
+  </Card>
+</CardGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Custom Rules" icon="file-code" href="/features/custom-rules">
+    Create your own Vale rules to extend style guides
+  </Card>
+  <Card title="Editor" icon="pen" href="/features/editor">
+    Learn about the editing interface and alert navigation
+  </Card>
+</CardGroup>

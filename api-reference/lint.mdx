@@ -1,0 +1,383 @@
+---
+title: 'POST /api/lint'
+description: 'Lint documentation text against style guides'
+api: 'POST /api/lint'
+---
+
+## Overview
+
+The `/api/lint` endpoint processes documentation text through Vale CLI and returns linting alerts based on the selected style guide. It supports built-in style guides (Google, Microsoft, Red Hat) and custom Vale rules.
+
+## Endpoint
+
+```
+POST /api/lint
+```
+
+## Request Body
+
+<ParamField body="text" type="string" required>
+  The documentation text to lint. Must be a valid string.
+  
+  **Validation Rules**:
+  - Cannot be empty or null
+  - Maximum length: 1,048,576 characters (1MB)
+  - Type must be `string`
+</ParamField>
+
+<ParamField body="style" type="string" required>
+  The base style guide to apply during linting.
+  
+  **Allowed Values**:
+  - `"Google"` - Google Developer Documentation Style Guide
+  - `"Microsoft"` - Microsoft Writing Style Guide
+  - `"RedHat"` - Red Hat Documentation Style Guide
+  
+  **Validation**: Must match exactly one of the allowed values (case-sensitive).
+</ParamField>
+
+<ParamField body="customRules" type="array" optional>
+  Array of custom Vale rules to apply in addition to the base style guide.
+  
+  **Type Definition**:
+  ```typescript
+  interface CustomRule {
+    name: string;
+    content: string;
+  }
+  ```
+  
+  **Validation Rules**:
+  - Maximum array length: 10 rules
+  - Each rule's `content` field must not exceed 10,240 characters (10KB)
+  - Rule names are sanitized to prevent path traversal attacks
+  - Names automatically get `.yml` extension if not present
+  
+  **Example**:
+  ```json
+  [
+    {
+      "name": "NoExclamation",
+      "content": "extends: existence\nmessage: Avoid exclamation marks\nlevel: warning\ntokens:\n  - '!'"
+    }
+  ]
+  ```
+</ParamField>
+
+## Request Example
+
+<CodeGroup>
+```javascript JavaScript Fetch
+const response = await fetch('/api/lint', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    text: 'This is a sample documentation. Please utilize this example.',
+    style: 'Google',
+    customRules: []
+  })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+```typescript TypeScript
+interface LintRequest {
+  text: string;
+  style: 'Google' | 'Microsoft' | 'RedHat';
+  customRules?: Array<{
+    name: string;
+    content: string;
+  }>;
+}
+
+interface ValeAlert {
+  Action: {
+    Name: string;
+    Params: string[] | null;
+  };
+  Span: [number, number];
+  Check: string;
+  Description: string;
+  Link: string;
+  Message: string;
+  Severity: string;
+  Match: string;
+  Line: number;
+}
+
+const lintDocument = async (request: LintRequest): Promise<ValeAlert[]> => {
+  const response = await fetch('/api/lint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request)
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error);
+  }
+  
+  return await response.json();
+};
+```
+
+```bash cURL
+curl -X POST https://your-domain.com/api/lint \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "This is a sample documentation. Please utilize this example.",
+    "style": "Google",
+    "customRules": []
+  }'
+```
+
+```python Python
+import requests
+import json
+
+url = 'https://your-domain.com/api/lint'
+headers = {'Content-Type': 'application/json'}
+payload = {
+    'text': 'This is a sample documentation. Please utilize this example.',
+    'style': 'Google',
+    'customRules': []
+}
+
+response = requests.post(url, headers=headers, data=json.dumps(payload))
+data = response.json()
+print(data)
+```
+</CodeGroup>
+
+## Response
+
+### Success Response (200 OK)
+
+Returns an array of `ValeAlert` objects. An empty array indicates no style violations were found.
+
+<ResponseField name="[index]" type="ValeAlert[]">
+  Array of linting alerts detected by Vale
+</ResponseField>
+
+<ResponseField name="[index].Action" type="object">
+  Suggested action to fix the issue
+  
+  <Expandable title="properties">
+    <ResponseField name="Name" type="string">
+      Action name (e.g., "replace", "remove")
+    </ResponseField>
+    <ResponseField name="Params" type="string[] | null">
+      Action parameters (e.g., suggested replacements)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="[index].Span" type="[number, number]">
+  Character span within the line where the issue occurs. Zero-indexed.
+  
+  **Example**: `[14, 21]` indicates characters 14-21 on the line
+</ResponseField>
+
+<ResponseField name="[index].Check" type="string">
+  The Vale rule that triggered this alert (e.g., "Google.WordList")
+</ResponseField>
+
+<ResponseField name="[index].Description" type="string">
+  Detailed description of the rule
+</ResponseField>
+
+<ResponseField name="[index].Link" type="string">
+  URL to documentation for this rule
+</ResponseField>
+
+<ResponseField name="[index].Message" type="string">
+  Human-readable message describing the issue
+</ResponseField>
+
+<ResponseField name="[index].Severity" type="string">
+  Alert severity level
+  
+  **Values**: `"error"`, `"warning"`, `"suggestion"`
+</ResponseField>
+
+<ResponseField name="[index].Match" type="string">
+  The exact text that matched the rule
+</ResponseField>
+
+<ResponseField name="[index].Line" type="number">
+  Line number where the issue occurs (1-indexed)
+</ResponseField>
+
+### Example Success Response
+
+```json
+[
+  {
+    "Action": {
+      "Name": "replace",
+      "Params": ["use"]
+    },
+    "Span": [14, 21],
+    "Check": "Google.WordList",
+    "Description": "Use simple words",
+    "Link": "https://developers.google.com/style/word-list#utilize",
+    "Message": "Use 'use' instead of 'utilize'.",
+    "Severity": "warning",
+    "Match": "utilize",
+    "Line": 1
+  }
+]
+```
+
+### Error Responses
+
+<Tabs>
+  <Tab title="400 - Invalid Input">
+    **Missing or Invalid Text**
+    ```json
+    {
+      "error": "No text provided or invalid format"
+    }
+    ```
+    
+    **Text Too Long**
+    ```json
+    {
+      "error": "Text exceeds maximum allowed length of 1048576 characters"
+    }
+    ```
+    
+    **Invalid Style Guide**
+    ```json
+    {
+      "error": "Invalid style guide selected"
+    }
+    ```
+    
+    **Too Many Custom Rules**
+    ```json
+    {
+      "error": "Too many custom rules. Maximum is 10"
+    }
+    ```
+    
+    **Rule Too Large**
+    ```json
+    {
+      "error": "Rule \"RuleName\" exceeds maximum allowed length of 10240 characters"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="500 - Server Error">
+    **Vale Execution Failed**
+    ```json
+    {
+      "error": "Vale execution failed"
+    }
+    ```
+    
+    **Parse Error**
+    ```json
+    {
+      "error": "Failed to parse Vale output"
+    }
+    ```
+    
+    **Internal Error**
+    ```json
+    {
+      "error": "Internal server error"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+### Validation Constants
+
+The following constants are defined in the source code at `app/api/lint/route.ts:10-14`:
+
+```typescript
+const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+const MAX_TEXT_LENGTH = 1024 * 1024; // 1MB
+const MAX_CUSTOM_RULES = 10;
+const MAX_RULE_LENGTH = 10 * 1024; // 10KB
+```
+
+### Processing Flow
+
+1. **Input Validation** (Lines 21-43)
+   - Validates text existence and type
+   - Checks text length against `MAX_TEXT_LENGTH`
+   - Validates style against `ALLOWED_STYLES`
+   - Validates custom rules array length and individual rule sizes
+
+2. **Temporary File Creation** (Lines 45-47)
+   - Creates temporary directory with prefix `vale-`
+   - Writes text to `doc.md` file
+
+3. **Style Directory Setup** (Lines 49-68)
+   - Creates temporary styles directory
+   - Symlinks existing style guides
+   - Handles cross-platform compatibility (Windows/Linux)
+
+4. **Custom Rules Processing** (Lines 72-98)
+   - Creates `Custom` style directory
+   - Sanitizes rule names to prevent path traversal
+   - Writes custom rule files
+   - Adds to `BasedOnStyles` configuration
+
+5. **Vale Execution** (Lines 109-136)
+   - Makes Vale binary executable (serverless compatibility)
+   - Executes Vale with temporary `.vale.ini` configuration
+   - Parses JSON output
+   - Handles non-zero exit codes (Vale returns non-zero when alerts found)
+
+6. **Cleanup** (Lines 138-144)
+   - Removes temporary directory recursively
+   - Logs cleanup failures without throwing errors
+
+<Info>
+Vale returns a non-zero exit code when it finds alerts, so the API catches the error and parses stdout to retrieve results. See `app/api/lint/route.ts:124-134`.
+</Info>
+
+## Custom Rules Format
+
+Custom rules must follow Vale's YAML rule syntax:
+
+```yaml
+extends: existence
+message: "Your custom message"
+level: warning
+tokens:
+  - pattern1
+  - pattern2
+```
+
+**Common Rule Types**:
+- `existence` - Check for presence of specific patterns
+- `substitution` - Suggest replacements
+- `occurrence` - Limit word usage
+- `repetition` - Detect repeated words
+- `consistency` - Enforce consistent spelling
+- `conditional` - Apply rules conditionally
+- `capitalization` - Enforce capitalization rules
+
+See [Vale's documentation](https://vale.sh/docs/topics/styles/) for complete rule syntax.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Vale Integration" icon="code-branch" href="/api-reference/vale-integration">
+    Learn how Vale CLI is configured and executed
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/api-reference/error-handling">
+    Comprehensive error codes and troubleshooting
+  </Card>
+</CardGroup>

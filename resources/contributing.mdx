@@ -1,0 +1,525 @@
+---
+title: "Contributing"
+description: "Guide for contributing to the Verbalize project"
+---
+
+## Welcome Contributors!
+
+Verbalize is an open-source project, and we welcome contributions from the community. Whether you're fixing a bug, adding a feature, improving documentation, or sharing Vale rules, your contributions are valued.
+
+## Ways to Contribute
+
+<CardGroup cols={2}>
+  <Card title="Report Bugs" icon="bug">
+    Found an issue? Report it on GitHub Issues
+  </Card>
+  <Card title="Suggest Features" icon="lightbulb">
+    Have an idea? Open a feature request
+  </Card>
+  <Card title="Submit Code" icon="code">
+    Fix bugs or implement features with pull requests
+  </Card>
+  <Card title="Improve Docs" icon="book">
+    Help make the documentation better
+  </Card>
+  <Card title="Share Rules" icon="file-code">
+    Contribute custom Vale rules for others to use
+  </Card>
+  <Card title="Help Others" icon="comments">
+    Answer questions in GitHub Discussions
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+### Prerequisites
+
+Before contributing, ensure you have:
+
+- **Node.js 20+** - JavaScript runtime
+- **npm** - Package manager
+- **Git** - Version control
+- **Vale CLI** - Linting engine (installed via `npm install`)
+- **Code editor** - VS Code, Cursor, or similar
+
+### Setting Up Development Environment
+
+<Steps>
+  <Step title="Fork the repository">
+    Visit [github.com/mtgr18977/verbalize](https://github.com/mtgr18977/verbalize) and click **Fork**.
+  </Step>
+
+  <Step title="Clone your fork">
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/verbalize.git
+    cd verbalize
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+    
+    This automatically runs `postinstall` script to install Vale binary.
+  </Step>
+
+  <Step title="Verify Vale installation">
+    ```bash
+    vale --version
+    # Should output: vale version X.Y.Z
+    ```
+  </Step>
+
+  <Step title="Start development server">
+    ```bash
+    npm run dev
+    ```
+    
+    Open [http://localhost:3000](http://localhost:3000) to see the app.
+  </Step>
+
+  <Step title="Run tests">
+    ```bash
+    npm test
+    ```
+    
+    Ensure all tests pass before making changes.
+  </Step>
+</Steps>
+
+## Development Workflow
+
+### 1. Create a Feature Branch
+
+Always work on a feature branch, not `main`:
+
+```bash
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/bug-description
+```
+
+**Branch naming conventions:**
+- `feature/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation changes
+- `refactor/` - Code refactoring
+- `test/` - Test improvements
+
+### 2. Make Your Changes
+
+Follow the project's coding standards:
+
+#### Code Conventions
+
+| Convention | Standard | Example |
+|-----------|----------|---------|
+| **File Naming** | kebab-case | `lint-results.tsx` |
+| **Components** | PascalCase | `EditorPanel`, `ResultsCard` |
+| **Functions** | camelCase | `handleLint()`, `processResults()` |
+| **Types/Interfaces** | PascalCase | `ValeAlert`, `CustomRule` |
+| **Constants** | UPPER_SNAKE_CASE | `MAX_FILE_SIZE` |
+| **CSS Classes** | Tailwind utilities | `flex items-center gap-2` |
+
+#### TypeScript Standards
+
+<Note>
+Verbalize uses TypeScript strict mode. All code must pass type checking.
+</Note>
+
+```typescript
+// ✅ Good: Explicit types
+interface EditorProps {
+  initialValue?: string;
+  onLint: (text: string) => Promise<void>;
+  disabled?: boolean;
+}
+
+export function Editor({ initialValue = '', onLint, disabled = false }: EditorProps) {
+  // Implementation
+}
+
+// ❌ Bad: Using 'any'
+function processData(data: any) {
+  // Don't do this
+}
+```
+
+#### Import Order
+
+Organize imports in this order:
+
+```typescript
+// 1. React imports
+import { useState, useEffect } from 'react';
+
+// 2. External libraries
+import { AlertCircle } from 'lucide-react';
+
+// 3. Internal components
+import { LintEditor } from '@/components/LintEditor';
+import { ResultsPanel } from '@/components/ResultsPanel';
+
+// 4. Types
+import type { ValeAlert, CustomRule } from '@/types';
+
+// 5. Utilities
+import { formatDiagnostic } from '@/lib/utils';
+```
+
+### 3. Write Tests
+
+Add tests for your changes using Playwright:
+
+```typescript tests/your-feature.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Your Feature', () => {
+  test('should do something', async ({ page }) => {
+    await page.goto('http://localhost:3000');
+    
+    // Test implementation
+    await page.click('button[aria-label="Your Button"]');
+    
+    await expect(page.locator('.result')).toBeVisible();
+  });
+});
+```
+
+**Run tests:**
+```bash
+# Run all tests
+npm test
+
+# Run specific test file
+npx playwright test tests/your-feature.spec.ts
+
+# Run with UI mode for debugging
+npx playwright test --ui
+```
+
+### 4. Check Code Quality
+
+Before committing, verify your code:
+
+<Tabs>
+  <Tab title="Linting">
+    ```bash
+    npm run lint
+    ```
+    
+    Fix any ESLint errors or warnings.
+  </Tab>
+  
+  <Tab title="Type Checking">
+    ```bash
+    npm run build
+    ```
+    
+    Ensure TypeScript compilation succeeds.
+  </Tab>
+  
+  <Tab title="Tests">
+    ```bash
+    npm test
+    ```
+    
+    All tests must pass.
+  </Tab>
+</Tabs>
+
+### 5. Commit Your Changes
+
+Use clear, descriptive commit messages:
+
+```bash
+git add .
+git commit -m "feat: add custom rule validation"
+```
+
+**Commit message format:**
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, no logic changes)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Build process or auxiliary tool changes
+
+**Examples:**
+```bash
+feat: add dark mode toggle to settings panel
+fix: resolve Vale binary path issue on Windows
+docs: update deployment guide with Vercel instructions
+refactor: extract alert rendering into separate component
+```
+
+### 6. Push and Create Pull Request
+
+<Steps>
+  <Step title="Push to your fork">
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+
+  <Step title="Create Pull Request">
+    1. Visit your fork on GitHub
+    2. Click **Compare & pull request**
+    3. Fill in the PR template (see below)
+    4. Click **Create pull request**
+  </Step>
+
+  <Step title="Address review feedback">
+    Respond to any comments or requested changes from maintainers.
+  </Step>
+</Steps>
+
+## Pull Request Guidelines
+
+### PR Template
+
+When creating a PR, include:
+
+```markdown
+## Description
+Brief description of what this PR does.
+
+## Type of Change
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Testing
+Describe the tests you ran and how to reproduce them:
+
+- [ ] Test A
+- [ ] Test B
+
+## Screenshots
+(If applicable, add screenshots)
+
+## Checklist
+- [ ] My code follows the project's coding standards
+- [ ] I have performed a self-review of my code
+- [ ] I have commented my code where necessary
+- [ ] I have updated the documentation
+- [ ] My changes generate no new warnings
+- [ ] I have added tests that prove my fix is effective or my feature works
+- [ ] New and existing tests pass locally
+```
+
+### What to Expect
+
+<Steps>
+  <Step title="Automated checks">
+    GitHub Actions will run linting, type checking, and tests automatically.
+  </Step>
+
+  <Step title="Code review">
+    A maintainer will review your code, usually within 1-3 days.
+  </Step>
+
+  <Step title="Feedback & iteration">
+    Address any requested changes by pushing new commits to your branch.
+  </Step>
+
+  <Step title="Merge">
+    Once approved, your PR will be merged into `main`!
+  </Step>
+</Steps>
+
+## Code Review Process
+
+When reviewing your PR, we look for:
+
+- **Code quality** - Clean, readable, maintainable code
+- **Test coverage** - Adequate tests for new functionality
+- **Documentation** - Updated docs where needed
+- **Performance** - No significant performance regressions
+- **Security** - No security vulnerabilities introduced
+- **Consistency** - Follows existing patterns and conventions
+
+## Reporting Bugs
+
+### Before Reporting
+
+<AccordionGroup>
+  <Accordion title="Search existing issues">
+    Check if the bug has already been reported: [GitHub Issues](https://github.com/mtgr18977/verbalize/issues)
+  </Accordion>
+
+  <Accordion title="Reproduce the bug">
+    Ensure you can consistently reproduce the issue.
+  </Accordion>
+
+  <Accordion title="Check latest version">
+    Verify the bug exists in the latest version of Verbalize.
+  </Accordion>
+</AccordionGroup>
+
+### Bug Report Template
+
+When reporting a bug, include:
+
+```markdown
+## Bug Description
+Clear and concise description of the bug.
+
+## Steps to Reproduce
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
+
+## Expected Behavior
+What you expected to happen.
+
+## Actual Behavior
+What actually happened.
+
+## Screenshots
+(If applicable)
+
+## Environment
+- OS: [e.g., macOS 14.0, Windows 11, Ubuntu 22.04]
+- Browser: [e.g., Chrome 120, Firefox 121, Safari 17]
+- Node.js version: [e.g., 20.10.0]
+- Verbalize version: [e.g., commit hash or deployment URL]
+
+## Additional Context
+Any other information about the problem.
+```
+
+## Suggesting Features
+
+We welcome feature suggestions! Before suggesting:
+
+1. **Check existing feature requests** - Someone may have already suggested it
+2. **Consider the scope** - Does it align with Verbalize's goals?
+3. **Think about alternatives** - What other solutions exist?
+
+### Feature Request Template
+
+```markdown
+## Feature Description
+Clear description of the feature you'd like to see.
+
+## Problem it Solves
+What problem does this feature address?
+
+## Proposed Solution
+How would you implement this feature?
+
+## Alternatives Considered
+What alternative solutions have you thought about?
+
+## Additional Context
+Screenshots, examples, or mockups if applicable.
+```
+
+## Contributing Vale Rules
+
+Share your custom Vale rules with the community!
+
+### Sharing Custom Rules
+
+<Steps>
+  <Step title="Create your rule">
+    Write a Vale rule following the [Vale documentation](https://vale.sh/docs/topics/styles/):
+    ```yaml BrandNames.yml
+    extends: substitution
+    message: "Use '%s' instead of '%s'"
+    level: error
+    ignorecase: false
+    swap:
+      javascript: JavaScript
+      typescript: TypeScript
+      github: GitHub
+      npm: npm
+    ```
+  </Step>
+
+  <Step title="Test thoroughly">
+    Test your rule against various documents to ensure it works correctly.
+  </Step>
+
+  <Step title="Document your rule">
+    Add a comment at the top explaining what it does:
+    ```yaml
+    # Ensures consistent capitalization of brand names and technologies
+    extends: substitution
+    # ...
+    ```
+  </Step>
+
+  <Step title="Share it">
+    - Add to `public/examples/` directory via PR
+    - Share in GitHub Discussions
+    - Create a blog post or gist
+  </Step>
+</Steps>
+
+## Documentation Contributions
+
+Documentation improvements are always welcome!
+
+### Types of Documentation
+
+- **README.md** - Project overview and quick start
+- **AGENTS.md** - Architecture and developer context
+- **Code comments** - Inline documentation
+- **API documentation** - Endpoint specs
+- **Tutorial content** - How-to guides
+
+### Documentation Standards
+
+- Use clear, concise language
+- Include code examples where relevant
+- Keep examples up-to-date with the codebase
+- Test all commands and code snippets
+- Use proper Markdown formatting
+
+## Community Guidelines
+
+Verbalize follows a Code of Conduct. Please be:
+
+- **Respectful** - Treat everyone with respect
+- **Collaborative** - Work together constructively
+- **Inclusive** - Welcome newcomers and diverse perspectives
+- **Professional** - Keep discussions focused and productive
+
+## Getting Help
+
+Need help contributing?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/mtgr18977/verbalize/discussions">
+    Ask questions and get help from the community
+  </Card>
+  <Card title="Architecture Guide" icon="diagram-project" href="/resources/architecture">
+    Learn how Verbalize works internally
+  </Card>
+  <Card title="Development Setup" icon="code" href="/deployment/setup">
+    Detailed setup instructions
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/resources/troubleshooting">
+    Solutions to common issues
+  </Card>
+</CardGroup>
+
+## Recognition
+
+All contributors are recognized in:
+
+- GitHub contributors page
+- Release notes (for significant contributions)
+- Project README
+
+Thank you for contributing to Verbalize! 🎉
+
+## License
+
+By contributing to Verbalize, you agree that your contributions will be licensed under the MIT License.

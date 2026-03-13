@@ -1,80 +1,409 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Verbalize in under 5 minutes - from installation to your first lint
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide will walk you through setting up Verbalize locally and running your first documentation lint. By the end, you'll understand how to use the editor, select style guides, and interpret linting results.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This quickstart assumes you have Node.js 20+ and npm installed on your system.
 </Note>
+
+## Getting Started
+
+<Steps>
+  <Step title="Clone and Install Dependencies">
+    First, clone the repository and install all required dependencies:
+
+    ```bash
+    git clone https://github.com/your-org/verbalize.git
+    cd verbalize
+    npm install
+    ```
+
+    The `postinstall` script will automatically download and install the Vale binary:
+
+    ```json
+    {
+      "scripts": {
+        "postinstall": "node scripts/install-vale.js"
+      }
+    }
+    ```
+
+    <Note>
+      The Vale binary is platform-specific and will be installed for your operating system (Linux, macOS, or Windows).
+    </Note>
+  </Step>
+
+  <Step title="Verify Vale Installation">
+    Confirm that Vale was installed successfully:
+
+    ```bash
+    # Check Vale version
+    vale --version
+
+    # Or verify the binary exists
+    ls -la vale  # Linux/macOS
+    dir vale.exe # Windows
+    ```
+
+    You should see output similar to:
+    ```
+    vale version 3.x.x
+    ```
+  </Step>
+
+  <Step title="Start the Development Server">
+    Launch the Next.js development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    The application will start on `http://localhost:3000`. You should see:
+
+    ```bash
+    ▲ Next.js 16.1.6
+    - Local:        http://localhost:3000
+    - Ready in 1.2s
+    ```
+
+    <Warning>
+      Make sure port 3000 is not already in use. If it is, Next.js will automatically use the next available port.
+    </Warning>
+  </Step>
+
+  <Step title="Open the Application">
+    Navigate to `http://localhost:3000` in your web browser. You'll see the Verbalize interface with three main sections:
+
+    - **Left Panel**: Settings sidebar with style guide selection
+    - **Center Columns**: Three-column layout (Editor, Preview, Results)
+    - **Top Bar**: Theme toggle and status indicators
+  </Step>
+
+  <Step title="Write Your First Documentation">
+    In the **Editor** column (left), type some sample documentation:
+
+    ```markdown
+    # Getting Started
+
+    This guide will help you get setup with our API.
+    You should utilize the endpoints documented below.
+
+    ## Authentication
+
+    Please login to the dashboard to get your API key.
+    ```
+
+    As you type, the **Preview** column (center) will render your Markdown in real-time.
+  </Step>
+
+  <Step title="Select a Style Guide">
+    In the left sidebar, choose a style guide from the dropdown:
+
+    ```typescript
+    // Available style guides from app/api/lint/route.ts:11
+    const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+    ```
+
+    Each style guide has different rules:
+    - **Google Developer**: Focuses on clarity, active voice, and developer-friendly language
+    - **Microsoft Writing**: Emphasizes simplicity and accessibility
+    - **Red Hat Style**: Technical documentation standards for enterprise environments
+
+    Select **Google** for this tutorial.
+  </Step>
+
+  <Step title="Run Your First Lint">
+    Click the **"Run Linting"** button at the bottom of the sidebar:
+
+    ```typescript
+    // From app/page.tsx:49-82
+    const handleLint = async () => {
+      const normalizedText = text.replace(/\r\n/g, '\n');
+      
+      const response = await fetch('/api/lint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: normalizedText, style, customRules }),
+      });
+      
+      const data = await response.json();
+      setResults(data as ValeAlert[]);
+    };
+    ```
+
+    The linting process typically completes in under 2 seconds.
+  </Step>
+
+  <Step title="Review Linting Results">
+    The **Results** column (right) will display any style violations found in your documentation:
+
+    Based on the example text, you might see alerts like:
+
+    <CardGroup cols={1}>
+      <Card title="Error: 'get setup' (Line 3)" icon="xmark">
+        **Message**: Did you really mean 'get setup'?
+        
+        **Suggestion**: Use "set up" (verb form) instead of "setup" (noun form)
+        
+        **Rule**: Google.WordList
+      </Card>
+      <Card title="Warning: 'utilize' (Line 4)" icon="triangle-exclamation">
+        **Message**: Use 'use' instead of 'utilize'
+        
+        **Suggestion**: Prefer simpler, more direct language
+        
+        **Rule**: Google.WordList
+      </Card>
+      <Card title="Suggestion: 'Please login' (Line 8)" icon="lightbulb">
+        **Message**: Use 'sign in' instead of 'login'
+        
+        **Suggestion**: "Sign in" is the preferred terminology
+        
+        **Rule**: Google.WordList
+      </Card>
+    </CardGroup>
+
+    <Note>
+      Click any alert to jump directly to that location in the editor. The text will be automatically highlighted.
+    </Note>
+  </Step>
+
+  <Step title="Fix Issues and Re-lint">
+    Update your documentation based on the suggestions:
+
+    ```markdown
+    # Getting Started
+
+    This guide will help you set up our API.
+    You should use the endpoints documented below.
+
+    ## Authentication
+
+    Sign in to the dashboard to get your API key.
+    ```
+
+    Click **"Run Linting"** again to verify all issues are resolved. You should now see:
+
+    ```
+    Document Clean
+    No style violations detected.
+    ```
+  </Step>
+</Steps>
+
+## Understanding the API Flow
+
+When you click "Run Linting", here's what happens behind the scenes:
+
+```typescript
+// 1. Request is sent to the API route
+POST /api/lint
+Content-Type: application/json
+
+{
+  "text": "Your documentation content...",
+  "style": "Google",
+  "customRules": []
+}
+
+// 2. API validates input (app/api/lint/route.ts:16-43)
+if (text.length > MAX_TEXT_LENGTH) {
+  return NextResponse.json(
+    { error: 'Text exceeds maximum allowed length' }, 
+    { status: 400 }
+  );
+}
+
+// 3. Temporary file is created
+const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vale-'));
+const tmpFile = path.join(tmpDir, 'doc.md');
+await fs.writeFile(tmpFile, text);
+
+// 4. Vale configuration is generated
+const valeIni = `
+StylesPath = ${tempStylesDir}
+MinAlertLevel = suggestion
+[*.md]
+BasedOnStyles = ${basedOnStyles}
+`;
+
+// 5. Vale CLI is executed
+const { stdout } = await execFileAsync(
+  valePath, 
+  [`--config=${iniFile}`, '--output=JSON', tmpFile]
+);
+
+// 6. Results are parsed and returned
+const results = JSON.parse(stdout);
+return NextResponse.json(results[tmpFile] || []);
+```
+
+## Working with Custom Rules
+
+To enforce organization-specific style requirements:
+
+<Steps>
+  <Step title="Create a Vale Rule File">
+    Create a YAML file with your custom rule (e.g., `company-terms.yml`):
+
+    ```yaml
+    extends: substitution
+    message: Use '%s' instead of '%s'
+    level: warning
+    ignorecase: true
+    swap:
+      utilize: use
+      leverage: use
+      methodology: method
+    ```
+  </Step>
+
+  <Step title="Upload the Rule">
+    In the Verbalize sidebar:
+    1. Click **"Upload .yml rule"** under "Custom Rules"
+    2. Select your `company-terms.yml` file
+    3. The rule will appear in the custom rules list
+
+    ```typescript
+    // From app/page.tsx:31
+    interface CustomRule {
+      name: string;
+      content: string;
+    }
+    ```
+  </Step>
+
+  <Step title="Lint with Custom Rules">
+    Your custom rules will be combined with the base style guide:
+
+    ```typescript
+    // From app/api/lint/route.ts:97
+    basedOnStyles = `${style}, Custom`;
+    ```
+
+    All alerts from both the base style guide and your custom rules will appear in the results panel.
+  </Step>
+</Steps>
+
+<Warning>
+  **Limits**: You can upload up to 10 custom rules, each with a maximum size of 10KB.
+</Warning>
+
+## Additional Features
+
+### Uploading Documents
+
+Instead of typing, you can upload existing Markdown files:
+
+```typescript
+// From app/page.tsx:100-111
+const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const content = (event.target?.result as string).replace(/\r\n/g, '\n');
+    setText(content);
+  };
+  reader.readAsText(file);
+};
+```
+
+Click **"Upload MD/MDX"** in the sidebar to load a document.
+
+### Theme Toggle
+
+Switch between light and dark mode using the sun/moon icon in the top-right corner:
+
+```typescript
+// From app/page.tsx:322-328
+<button
+  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+  className="p-2 rounded-lg"
+>
+  {theme === 'dark' ? <Sun /> : <Moon />}
+</button>
+```
+
+### Keyboard Shortcuts
+
+- **Copy Content**: Click the copy icon in the editor header
+- **Clear Editor**: Click the trash icon (requires confirmation)
+- **Navigate to Alert**: Click any alert in the results panel to jump to that line
+
+## Performance Optimization
+
+### Document Size Guidelines
+
+```typescript
+// From app/api/lint/route.ts:12
+const MAX_TEXT_LENGTH = 1024 * 1024; // 1MB
+```
+
+<Note>
+  For optimal performance (< 2 seconds), keep documents under 50KB. Documents exceeding 100,000 characters may require additional processing time.
+</Note>
+
+### Style Guide Impact
+
+Enabling multiple style guides or custom rules increases processing time:
+
+- **Single style guide**: ~1-2 seconds
+- **Style guide + custom rules**: ~2-3 seconds
+- **Cold start (first request)**: ~3-5 seconds
+
+## Troubleshooting
+
+### Vale Binary Not Found
+
+If you see `Error: spawn vale ENOENT`:
+
+```bash
+# Manually install Vale
+node scripts/install-vale.js
+
+# Verify installation
+vale --version
+```
+
+### Port Already in Use
+
+If port 3000 is occupied:
+
+```bash
+# Use a different port
+PORT=3001 npm run dev
+```
+
+### Linting Timeout
+
+For very large documents, increase the timeout:
+
+```toml
+# netlify.toml
+[functions]
+  timeout = 30
+```
+
+## Next Steps
+
+Now that you've completed your first lint, explore more features:
+
+<CardGroup cols={2}>
+  <Card title="Style Guides" icon="book" href="/features/style-guides">
+    Learn about the differences between Google, Microsoft, and Red Hat style guides
+  </Card>
+  <Card title="Custom Rules" icon="code" href="/features/custom-rules">
+    Create advanced Vale rules for your organization
+  </Card>
+  <Card title="API Reference" icon="brackets-curly" href="/api-reference/overview">
+    Use the REST API for programmatic linting
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/deployment/setup">
+    Deploy Verbalize to production
+  </Card>
+</CardGroup>

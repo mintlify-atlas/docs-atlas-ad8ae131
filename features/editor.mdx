@@ -1,0 +1,274 @@
+---
+title: 'Markdown Editor'
+description: 'Write and edit documentation with real-time linting feedback in the three-column interface'
+icon: 'pen'
+---
+
+## Overview
+
+The Markdown editor is the primary workspace in Verbalize where you write and edit your technical documentation. It features a clean, distraction-free interface with monospace font rendering and synchronized scrolling with the preview panel.
+
+<Info>
+The editor supports documents up to 1MB in size and automatically normalizes line endings to ensure consistent linting results.
+</Info>
+
+## Interface Layout
+
+Verbalize uses a three-column layout designed for efficient documentation workflows:
+
+<CardGroup cols={3}>
+  <Card title="Editor Panel" icon="pen">
+    Left column with text input, character counter, and toolbar actions
+  </Card>
+  <Card title="Preview Panel" icon="eye">
+    Middle column showing rendered Markdown with synchronized scrolling
+  </Card>
+  <Card title="Results Panel" icon="triangle-exclamation">
+    Right column displaying Vale linting alerts with severity badges
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Text Input
+
+The editor is implemented as a textarea component with several enhancements:
+
+```typescript
+// From app/page.tsx:359-366
+<textarea
+  ref={editorRef}
+  value={text}
+  onChange={(e) => setText(e.target.value)}
+  onScroll={handleScroll}
+  className="flex-1 p-8 outline-none resize-none font-mono text-sm leading-relaxed text-gray-700 dark:text-gray-200 bg-transparent custom-scrollbar"
+  placeholder="Start typing your documentation (Markdown supported)..."
+/>
+```
+
+**Features:**
+- Monospace font for precise formatting
+- Auto-expanding to fill available space
+- Custom scrollbar styling for better aesthetics
+- Dark mode support with theme-aware colors
+- Visual selection highlighting with yellow overlay
+
+### Character Counter
+
+Track your document length in real-time with the character counter displayed in the editor header:
+
+```typescript
+// From app/page.tsx:348
+<span className="text-[9px] bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-gray-500 dark:text-gray-400 font-mono italic">{text.length} chars</span>
+```
+
+This helps you monitor document size and stay within the 1MB limit for optimal linting performance.
+
+### Toolbar Actions
+
+<Tabs>
+  <Tab title="Copy Content">
+    Copy the entire editor content to your clipboard with a single click:
+
+    ```typescript
+    // From app/page.tsx:117-121
+    const copyToClipboard = () => {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+    ```
+
+    The copy button provides visual feedback with a checkmark icon for 2 seconds after copying.
+  </Tab>
+  <Tab title="Clear Editor">
+    Remove all content from the editor with confirmation:
+
+    ```typescript
+    // From app/page.tsx:123-128
+    const clearEditor = () => {
+      if (text && confirm('Are you sure you want to clear the editor?')) {
+        setText('');
+        setResults([]);
+      }
+    };
+    ```
+
+    This action also clears any existing linting results to maintain interface consistency.
+  </Tab>
+</Tabs>
+
+## Document Upload
+
+Load Markdown and MDX files directly into the editor from your local filesystem:
+
+```typescript
+// From app/page.tsx:100-111
+const handleDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const content = (event.target?.result as string).replace(/\r\n/g, '\n');
+    setText(content);
+  };
+  reader.readAsText(file);
+  if (docInputRef.current) docInputRef.current.value = '';
+};
+```
+
+<Note>
+Uploaded files have their line endings normalized to `\n` to ensure Vale produces accurate line and column numbers in linting results.
+</Note>
+
+**Supported formats:**
+- `.md` - Markdown files
+- `.mdx` - MDX (Markdown with JSX)
+
+**Access from sidebar:**
+
+```typescript
+// From app/page.tsx:230-236
+<button
+  onClick={() => docInputRef.current?.click()}
+  className="w-full py-3 px-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all flex items-center justify-center gap-2 group"
+>
+  <FileText className="w-4 h-4 group-hover:scale-110 transition-transform" />
+  <span className="text-sm">Upload MD/MDX</span>
+</button>
+```
+
+## Synchronized Scrolling
+
+The editor and preview panels maintain synchronized scroll positions for seamless content navigation:
+
+```typescript
+// From app/page.tsx:130-138
+const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+  const source = e.currentTarget;
+  const target = source === editorRef.current ? previewRef.current : editorRef.current;
+
+  if (target) {
+    const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+    target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
+  }
+};
+```
+
+**How it works:**
+1. Detect scroll events on either the editor or preview panel
+2. Calculate the scroll position as a percentage of total scrollable height
+3. Apply the same percentage to the target panel
+4. Bidirectional - works when scrolling either panel
+
+<Info>
+This proportional scrolling approach ensures the editor and preview remain aligned even when the rendered content has different heights than the source text.
+</Info>
+
+## Alert Navigation
+
+Click on any linting alert in the results panel to jump directly to the problematic text in the editor:
+
+```typescript
+// From app/page.tsx:140-196
+const handleAlertClick = (alert: ValeAlert, e: React.MouseEvent) => {
+  if ((e.target as HTMLElement).closest('a')) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (!editorRef.current) return;
+
+  const textarea = editorRef.current;
+  const currentValue = textarea.value;
+  const lines = currentValue.split('\n');
+  let offset = 0;
+
+  // Calculate offset based on current textarea value
+  for (let i = 0; i < Math.min(alert.Line - 1, lines.length); i++) {
+    offset += lines[i].length + 1; // +1 for \n
+  }
+
+  const start = offset + alert.Span[0] - 1;
+  const end = offset + alert.Span[1];
+
+  // ... scroll calculation and text selection ...
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
+};
+```
+
+**The navigation system:**
+1. Converts line numbers to character offsets
+2. Uses a shadow textarea to calculate accurate scroll positions
+3. Centers the selected text in the viewport
+4. Highlights the problematic text with a selection
+5. Handles text wrapping for accurate positioning
+
+<Note>
+The shadow textarea technique accounts for line wrapping and ensures the selected text is properly centered regardless of font size or editor width.
+</Note>
+
+## Vale Alert Interface
+
+Linting results use the `ValeAlert` interface for type-safe alert handling:
+
+```typescript
+// From app/page.tsx:8-21
+interface ValeAlert {
+  Action: {
+    Name: string;
+    Params: string[] | null;
+  };
+  Span: [number, number];  // Character span within the line
+  Check: string;           // Rule name (e.g., "Google.Passive")
+  Description: string;     // Detailed explanation
+  Link: string;            // Documentation URL
+  Message: string;         // User-facing error message
+  Severity: string;        // "error", "warning", or "suggestion"
+  Match: string;           // The matched text
+  Line: number;            // Line number (1-indexed)
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Upload for Large Files" icon="upload">
+    For documents over 10,000 characters, upload files rather than pasting to avoid browser performance issues
+  </Card>
+  <Card title="Regular Linting" icon="play">
+    Run linting frequently as you write to catch style issues early rather than fixing them all at the end
+  </Card>
+  <Card title="Navigate with Alerts" icon="location-dot">
+    Click alerts to jump to issues instead of manually searching - this saves time on large documents
+  </Card>
+  <Card title="Save Work Externally" icon="floppy-disk">
+    Use the copy button to save your work periodically since the editor doesn't auto-save to local storage
+  </Card>
+</CardGroup>
+
+## Keyboard Shortcuts
+
+The editor supports standard browser text editing shortcuts:
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + A` | Select all text |
+| `Ctrl/Cmd + C` | Copy selected text |
+| `Ctrl/Cmd + V` | Paste from clipboard |
+| `Ctrl/Cmd + Z` | Undo changes |
+| `Ctrl/Cmd + Y` | Redo changes |
+| `Tab` | Insert tab character |
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Preview" icon="eye" href="/features/preview">
+    See your Markdown rendered in real-time as you type
+  </Card>
+  <Card title="Style Guides" icon="book" href="/features/style-guides">
+    Learn about the available style guide options for linting
+  </Card>
+</CardGroup>

@@ -1,97 +1,143 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Welcome to Verbalize"
+description: "A web-based assistant for technical writers that provides real-time documentation linting powered by Vale CLI"
 ---
 
-## Setting up
+<img
+  className="block dark:hidden"
+  src="/logo/light.svg"
+  alt="Verbalize Logo"
+  width="200"
+/>
+<img
+  className="hidden dark:block"
+  src="/logo/dark.svg"
+  alt="Verbalize Logo"
+  width="200"
+/>
 
-Get your documentation site up and running in minutes.
+## What is Verbalize?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Verbalize is a powerful web application designed to help technical writers create high-quality documentation by providing real-time linting against industry-standard style guides. Built with Next.js and powered by Vale CLI, Verbalize offers an intuitive three-column interface featuring an editor, live preview, and instant feedback.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Get Started"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Set up Verbalize in minutes and start linting your documentation
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
+    title="API Reference"
     icon="code"
-    href="/essentials/code"
+    href="/api-reference/overview"
   >
-    Add sample code to demonstrate how to use your product.
+    Explore the API endpoints and integration options
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="Style Guides"
+    icon="book-open"
+    href="/features/style-guides"
   >
-    Display images and other media.
+    Learn about Google, Microsoft, and Red Hat style guide support
   </Card>
   <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
+    title="Deploy to Netlify"
+    icon="cloud"
+    href="/deployment/netlify"
   >
-    Write once and reuse across your docs.
+    Deploy your own instance of Verbalize to Netlify
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Key Features
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+Verbalize provides everything you need to maintain consistent, high-quality technical documentation:
+
+<CardGroup cols={3}>
+  <Card
+    title="Real-time Linting"
+    icon="circle-check"
+  >
+    Get instant feedback as you write with Vale CLI integration
+  </Card>
+  <Card
+    title="Multiple Style Guides"
+    icon="books"
+  >
+    Choose from Google, Microsoft, or Red Hat style guides
+  </Card>
+  <Card
+    title="Custom Rules"
+    icon="file-code"
+  >
+    Upload your own Vale rules for personalized linting
+  </Card>
+  <Card
+    title="Live Preview"
+    icon="eye"
+  >
+    See your Markdown rendered in real-time with synchronized scrolling
+  </Card>
+  <Card
+    title="Dark Mode"
+    icon="moon"
+  >
+    Switch between light and dark themes with persistent preferences
+  </Card>
+  <Card
+    title="File Upload"
+    icon="upload"
+  >
+    Import .md and .mdx files directly into the editor
+  </Card>
+</CardGroup>
+
+## How It Works
+
+<Steps>
+  <Step title="Write Documentation">
+    Use the built-in Markdown editor to write your technical documentation with full syntax support
+  </Step>
+  <Step title="Select Style Guide">
+    Choose your preferred style guide (Google, Microsoft, or Red Hat) or upload custom Vale rules
+  </Step>
+  <Step title="Run Linting">
+    Click the lint button to analyze your documentation against the selected style guide
+  </Step>
+  <Step title="Review Results">
+    View detailed alerts with severity levels, line numbers, and style guide references in the results panel
+  </Step>
+</Steps>
+
+## Why Verbalize?
+
+<Note>
+Verbalize combines the power of Vale CLI with a modern, user-friendly interface to make documentation quality assurance accessible to all technical writers.
+</Note>
+
+- **Zero Configuration**: Start linting immediately with pre-configured style guides
+- **Professional Standards**: Leverage industry-leading style guides from Google, Microsoft, and Red Hat
+- **Extensible**: Add your own custom rules to match your organization's standards
+- **Developer-Friendly**: Built with TypeScript, Next.js, and React for easy customization
+- **Open Source**: MIT licensed and available on GitHub
+
+## Ready to Start?
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start Guide"
+    icon="play"
+    href="/quickstart"
+  >
+    Follow our quick start guide to begin linting in under 5 minutes
+  </Card>
+  <Card
+    title="Explore Features"
+    icon="compass"
+    href="/features/editor"
+  >
+    Discover all the features Verbalize has to offer
+  </Card>
+</CardGroup>

@@ -1,0 +1,392 @@
+---
+title: 'Live Preview'
+description: 'See your Markdown rendered in real-time with synchronized scrolling and prose styling'
+icon: 'eye'
+---
+
+## Overview
+
+The live preview panel renders your Markdown content in real-time as you type, providing immediate visual feedback on formatting, structure, and final appearance. It uses react-markdown for secure, standards-compliant rendering with prose styling optimized for technical documentation.
+
+<Info>
+The preview panel is the middle column in Verbalize's three-column interface, positioned between the editor and results panels.
+</Info>
+
+## Preview Rendering
+
+The preview uses ReactMarkdown for client-side rendering:
+
+```typescript
+// From app/page.tsx:377-386
+<div
+  ref={previewRef}
+  onScroll={handleScroll}
+  className="flex-1 p-10 overflow-y-auto custom-scrollbar"
+>
+  <article className="prose prose-slate dark:prose-invert max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-blue-600 prose-img:rounded-xl">
+    {/* ReactMarkdown is secure by default as it does not render HTML unless explicitly configured with rehype-raw */}
+    <ReactMarkdown>{text || '*Rich preview will appear here...*'}</ReactMarkdown>
+  </article>
+</div>
+```
+
+**Key features:**
+- Instant rendering without page reloads
+- Security by default - HTML tags are escaped
+- Dark mode support with theme-aware styling
+- Responsive typography with prose classes
+
+### ReactMarkdown Import
+
+```typescript
+// From app/page.tsx:4
+import ReactMarkdown from 'react-markdown';
+```
+
+ReactMarkdown is a React component that renders Markdown using the CommonMark specification without the security risks of `dangerouslySetInnerHTML`.
+
+## Prose Styling
+
+The preview uses Tailwind Typography (`@tailwindcss/typography`) for beautiful, readable prose:
+
+```css
+prse prose-slate          /* Base color scheme */
+dark:prose-invert         /* Dark mode colors */
+max-w-none                /* Full width, no text width constraint */
+prose-headings:font-black /* Extra bold headings */
+prose-headings:tracking-tight /* Tighter heading spacing */
+prose-a:text-blue-600     /* Blue links */
+prose-img:rounded-xl      /* Rounded image corners */
+```
+
+### Default Prose Styles
+
+Tailwind Typography automatically styles:
+
+- **Headings** - Hierarchical sizing from H1 to H6
+- **Paragraphs** - Optimal line height and spacing
+- **Lists** - Proper indentation and markers
+- **Blockquotes** - Left border and italic text
+- **Code blocks** - Monospace font with background
+- **Tables** - Border styling and cell padding
+- **Links** - Underline on hover
+- **Images** - Responsive sizing with rounded corners
+- **Strong/Em** - Bold and italic emphasis
+
+## Synchronized Scrolling
+
+The preview panel maintains scroll synchronization with the editor:
+
+```typescript
+// From app/page.tsx:130-138
+const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+  const source = e.currentTarget;
+  const target = source === editorRef.current ? previewRef.current : editorRef.current;
+
+  if (target) {
+    const percentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+    target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
+  }
+};
+```
+
+**How it works:**
+1. Detect scroll event on either editor or preview
+2. Calculate scroll position as percentage of total height
+3. Apply same percentage to the other panel
+4. Works bidirectionally - scroll either panel
+
+<Note>
+Proportional scrolling ensures alignment even when rendered content height differs from source text height due to headings, images, or formatted elements.
+</Note>
+
+## Supported Markdown
+
+ReactMarkdown supports standard CommonMark syntax:
+
+<Tabs>
+  <Tab title="Text Formatting">
+    ```markdown
+    **bold text**
+    *italic text*
+    ~~strikethrough~~
+    `inline code`
+    ```
+
+    Renders as:
+    - **bold text**
+    - *italic text*
+    - ~~strikethrough~~
+    - `inline code`
+  </Tab>
+  <Tab title="Headings">
+    ```markdown
+    # Heading 1
+    ## Heading 2
+    ### Heading 3
+    #### Heading 4
+    ##### Heading 5
+    ###### Heading 6
+    ```
+
+    Renders with hierarchical sizing and font-black weight
+  </Tab>
+  <Tab title="Lists">
+    ```markdown
+    Unordered:
+    - Item one
+    - Item two
+      - Nested item
+
+    Ordered:
+    1. First item
+    2. Second item
+       1. Nested item
+    ```
+
+    Renders with proper indentation and markers
+  </Tab>
+  <Tab title="Links & Images">
+    ```markdown
+    [Link text](https://example.com)
+    ![Alt text](image.png)
+    ```
+
+    Links render in blue with hover underline
+    Images render with rounded corners (rounded-xl)
+  </Tab>
+  <Tab title="Code Blocks">
+    ````markdown
+    ```javascript
+    function hello() {
+      console.log('Hello world');
+    }
+    ```
+    ````
+
+    Renders with monospace font and background
+  </Tab>
+  <Tab title="Blockquotes">
+    ```markdown
+    > This is a blockquote
+    > with multiple lines
+    ```
+
+    Renders with left border and italic styling
+  </Tab>
+  <Tab title="Tables">
+    ```markdown
+    | Header 1 | Header 2 |
+    |----------|----------|
+    | Cell 1   | Cell 2   |
+    | Cell 3   | Cell 4   |
+    ```
+
+    Renders with borders and proper cell padding
+  </Tab>
+  <Tab title="Horizontal Rules">
+    ```markdown
+    ---
+    ```
+
+    Renders as a horizontal divider line
+  </Tab>
+</Tabs>
+
+## Security
+
+ReactMarkdown is secure by default:
+
+```typescript
+// From app/page.tsx:383 comment
+{/* ReactMarkdown is secure by default as it does not render HTML unless explicitly configured with rehype-raw */}
+```
+
+**Security features:**
+- HTML tags are escaped and displayed as text
+- No script execution from user input
+- No XSS vulnerabilities from Markdown content
+- Safe for untrusted user input
+
+<Note>
+If you need to render HTML in Markdown, you must explicitly add the `rehype-raw` plugin. Verbalize intentionally omits this for security.
+</Note>
+
+## Theme Support
+
+The preview adapts to light and dark themes:
+
+```typescript
+// From app/page.tsx:37
+const { theme, setTheme } = useTheme();
+```
+
+**Theme classes:**
+- `prose-slate` - Light mode with slate color palette
+- `dark:prose-invert` - Dark mode with inverted colors
+- Text colors automatically adjust for readability
+- Background remains transparent to inherit from parent
+
+### Theme Toggle
+
+```typescript
+// From app/page.tsx:322-329
+<button
+  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+  className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+  title="Toggle Theme"
+>
+  {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+</button>
+```
+
+Located in the top-right header for easy access.
+
+## Custom Scrollbar
+
+The preview uses custom scrollbar styling for a polished appearance:
+
+```css
+/* From app/page.tsx:451-470 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+```
+
+**Features:**
+- 4px width for minimal visual weight
+- Rounded scrollbar thumb
+- Theme-aware colors
+- Hover state for interactivity
+- Consistent with editor scrollbar
+
+## Preview Panel Header
+
+The header provides visual context:
+
+```typescript
+// From app/page.tsx:371-376
+<div className="h-12 px-6 flex items-center border-b border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50 shrink-0">
+  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-2">
+    <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+    Preview
+  </span>
+</div>
+```
+
+**Elements:**
+- Green status indicator (matches live editor concept)
+- "PREVIEW" label in uppercase
+- Theme-aware border and background
+- Fixed 48px height for alignment with other panels
+
+## Empty State
+
+When no text is entered, the preview shows a placeholder:
+
+```typescript
+// From app/page.tsx:384
+<ReactMarkdown>{text || '*Rich preview will appear here...*'}</ReactMarkdown>
+```
+
+The italic placeholder text indicates where content will appear without overwhelming the interface.
+
+## Performance Considerations
+
+The preview re-renders on every keystroke:
+
+```typescript
+// From app/page.tsx:362
+onChange={(e) => setText(e.target.value)}
+```
+
+ReactMarkdown is optimized for this use case:
+- Fast parsing with unified/remark ecosystem
+- Efficient React reconciliation for incremental updates
+- No syntax highlighting overhead (plain code blocks)
+- Handles documents up to 100,000 characters smoothly
+
+<Info>
+For very large documents (>100,000 characters), you may notice slight input lag. Consider splitting large documents into smaller sections for optimal performance.
+</Info>
+
+## Typography Best Practices
+
+The prose styling optimizes for technical documentation:
+
+### Reading Width
+
+```css
+max-w-none  /* Full width, no artificial constraint */
+```
+
+Unlike blog posts, technical docs benefit from wider text to accommodate code examples and tables.
+
+### Heading Hierarchy
+
+```css
+prose-headings:font-black
+prose-headings:tracking-tight
+```
+
+Extra-bold headings with tight tracking provide strong visual hierarchy for scanning documentation structure.
+
+### Link Styling
+
+```css
+prose-a:text-blue-600
+```
+
+Blue links follow web conventions for instant recognizability. Hover states add underlines for additional feedback.
+
+### Image Styling
+
+```css
+prose-img:rounded-xl
+```
+
+Rounded corners (12px radius) soften technical screenshots and diagrams.
+
+## Limitations
+
+<CardGroup cols={2}>
+  <Card title="No HTML Rendering" icon="code">
+    HTML tags are escaped for security. Use pure Markdown syntax only.
+  </Card>
+  <Card title="No Syntax Highlighting" icon="paintbrush">
+    Code blocks render with monospace font but without language-specific highlighting.
+  </Card>
+  <Card title="No MDX Components" icon="puzzle-piece">
+    Custom React components in MDX files won't render - only standard Markdown is processed.
+  </Card>
+  <Card title="No Math Rendering" icon="function">
+    LaTeX/KaTeX math notation is not supported without additional plugins.
+  </Card>
+</CardGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Editor" icon="pen" href="/features/editor">
+    Learn about synchronized scrolling and text editing features
+  </Card>
+  <Card title="Style Guides" icon="book" href="/features/style-guides">
+    Understand how linting results relate to rendered content
+  </Card>
+</CardGroup>

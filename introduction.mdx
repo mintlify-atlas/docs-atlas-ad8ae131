@@ -1,0 +1,210 @@
+---
+title: Introduction
+description: Welcome to Verbalize - a real-time documentation linting assistant powered by Vale CLI
+---
+
+## What is Verbalize?
+
+Verbalize is a web-based SaaS application designed specifically for technical writers who want to ensure their documentation adheres to industry-standard style guides. Built with Next.js 16, TypeScript, and React, Verbalize provides real-time linting feedback powered by the Vale CLI engine.
+
+<CardGroup cols={2}>
+  <Card title="Real-time Linting" icon="bolt">
+    Get instant feedback on your documentation as you write, with results appearing in under 2 seconds for typical documents.
+  </Card>
+  <Card title="Multiple Style Guides" icon="books">
+    Choose from Google Developer, Microsoft Writing, or Red Hat documentation style guides.
+  </Card>
+  <Card title="Custom Rules" icon="code">
+    Upload your own Vale-compatible YAML rules to enforce organization-specific style requirements.
+  </Card>
+  <Card title="Live Preview" icon="eye">
+    See your Markdown documentation rendered in real-time with synchronized scrolling between editor and preview.
+  </Card>
+</CardGroup>
+
+## Who is Verbalize For?
+
+Verbalize is designed for:
+
+- **Technical Writers** who need to maintain consistency across large documentation projects
+- **Developer Relations Teams** creating API documentation and developer guides
+- **Content Teams** ensuring documentation meets organizational style standards
+- **Open Source Contributors** wanting to match project documentation guidelines
+
+## Key Capabilities
+
+### Style Guide Validation
+
+Verbalize supports three industry-standard style guides out of the box:
+
+```typescript
+const ALLOWED_STYLES = ['Google', 'Microsoft', 'RedHat'];
+```
+
+Each style guide includes comprehensive rules for:
+- Grammar and punctuation
+- Terminology and word choice
+- Formatting conventions
+- Tone and voice consistency
+
+### Real-time Architecture
+
+Verbalize uses a request-response cycle that processes your documentation through Vale CLI:
+
+```
+User Interface (Browser)
+         ↓
+    POST /api/lint
+    { text: string }
+         ↓
+Next.js API Route (/app/api/lint/route.ts)
+         ↓
+    1. Receive text input
+    2. Create temporary file
+    3. Execute Vale CLI
+         ↓
+    Vale Engine
+         ↓
+    4. Load .vale.ini
+    5. Apply style rules
+    6. Generate diagnostics
+         ↓
+    JSON Response
+    { diagnostics: [...] }
+         ↓
+User Interface (Display lint suggestions)
+```
+
+<Note>
+  Vale outputs JSON-formatted diagnostics with severity levels (error, warning, suggestion) that are transformed into a frontend-friendly structure.
+</Note>
+
+### Custom Rule Support
+
+Extend the built-in style guides with your own Vale-compatible rules:
+
+```typescript
+interface CustomRule {
+  name: string;
+  content: string;
+}
+
+// Maximum 10 custom rules, each up to 10KB
+const MAX_CUSTOM_RULES = 10;
+const MAX_RULE_LENGTH = 10 * 1024;
+```
+
+### Performance Characteristics
+
+<CardGroup cols={2}>
+  <Card title="Document Size" icon="file">
+    Supports documents up to 1MB in size
+  </Card>
+  <Card title="Processing Speed" icon="gauge">
+    Results in under 2 seconds for typical documents (< 10,000 words)
+  </Card>
+  <Card title="Concurrent Safety" icon="shield">
+    Request queuing prevents resource contention
+  </Card>
+  <Card title="Serverless Ready" icon="cloud">
+    Deployed as Netlify Functions with optimized cold starts
+  </Card>
+</CardGroup>
+
+## Tech Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|----------|
+| **Framework** | Next.js 16 (App Router) | Server-side rendering and routing |
+| **Language** | TypeScript | Type-safe development |
+| **Styling** | Tailwind CSS | Utility-first CSS framework |
+| **Icons** | Lucide React | Icon system |
+| **Linting Engine** | Vale CLI | Prose linting engine |
+| **Markdown Rendering** | react-markdown | Real-time preview |
+| **Testing** | Playwright | End-to-end testing |
+
+<Warning>
+  Verbalize is a SaaS web application. The Vale binary is automatically installed during deployment via the `postinstall` script in package.json.
+</Warning>
+
+## Design Philosophy
+
+### User Experience Principles
+
+1. **Minimal Cognitive Load** - The interface prioritizes the writing workspace with non-intrusive feedback
+2. **Real-time Feedback** - Linting results appear immediately without page reloads
+3. **Accessibility First** - All interactive elements include proper ARIA labels and keyboard navigation
+4. **Single-Page Workshop** - Editor, preview, and diagnostics are visible simultaneously
+
+### Interface Layout
+
+Verbalize uses a three-column layout for maximum productivity:
+
+```typescript
+// From app/page.tsx:338-448
+<div className="flex-1 grid grid-cols-1 lg:grid-cols-3 overflow-hidden">
+  {/* Column 1: Editor - Write your documentation */}
+  <section className="flex flex-col border-r">
+    <textarea
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      className="flex-1 p-8 font-mono text-sm"
+      placeholder="Start typing your documentation (Markdown supported)..."
+    />
+  </section>
+
+  {/* Column 2: Preview - See rendered Markdown */}
+  <section className="flex flex-col border-r">
+    <ReactMarkdown>{text}</ReactMarkdown>
+  </section>
+
+  {/* Column 3: Results - View linting alerts */}
+  <section className="flex flex-col">
+    {results.map((alert) => (
+      <div onClick={() => handleAlertClick(alert)}>
+        {alert.Message}
+      </div>
+    ))}
+  </section>
+</div>
+```
+
+## Data Types
+
+### Vale Alert Structure
+
+Each linting alert from Vale follows this TypeScript interface:
+
+```typescript
+interface ValeAlert {
+  Action: {
+    Name: string;
+    Params: string[] | null;
+  };
+  Span: [number, number];
+  Check: string;
+  Description: string;
+  Link: string;
+  Message: string;
+  Severity: string;
+  Match: string;
+  Line: number;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get started with Verbalize in under 5 minutes
+  </Card>
+  <Card title="Custom Rules" icon="sliders" href="/features/custom-rules">
+    Learn how to create and upload custom Vale rules
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Explore the REST API for programmatic access
+  </Card>
+  <Card title="Style Guides" icon="book" href="/features/style-guides">
+    Deep dive into supported style guides
+  </Card>
+</CardGroup>

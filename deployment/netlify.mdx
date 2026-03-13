@@ -1,0 +1,499 @@
+---
+title: 'Netlify Deployment'
+description: 'Step-by-step guide for deploying Verbalize to Netlify'
+---
+
+## Overview
+
+Verbalize is optimized for deployment on Netlify, leveraging Netlify Functions for the Vale linting API. This guide walks you through the complete deployment process.
+
+<Note>
+  Netlify's serverless architecture is ideal for Verbalize because the Vale CLI can be bundled with the function deployment, eliminating the need for custom server management.
+</Note>
+
+## Prerequisites
+
+Before deploying to Netlify, ensure you have:
+
+<CardGroup cols={2}>
+  <Card title="Netlify Account" icon="netlify">
+    Create a free account at [netlify.com](https://netlify.com)
+  </Card>
+  <Card title="Git Repository" icon="github">
+    Your code must be in a Git repository (GitHub, GitLab, or Bitbucket)
+  </Card>
+  <Card title="Netlify CLI (Optional)" icon="terminal">
+    For local testing and manual deployments
+  </Card>
+  <Card title="Local Setup Complete" icon="check">
+    Verify your app works locally first
+  </Card>
+</CardGroup>
+
+## Deployment Configuration
+
+### Netlify Configuration File
+
+Verbalize includes a `netlify.toml` file that configures the build and deployment settings:
+
+```toml netlify.toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[functions]
+  # Ensure the vale binary and styles are included in the serverless function bundle
+  included_files = ["vale", "styles/**"]
+```
+
+<Accordion title="Configuration breakdown">
+  - **build.command**: Runs the Next.js production build
+  - **build.publish**: Specifies the output directory for static assets
+  - **functions.included_files**: Bundles Vale binary and style guides with Netlify Functions
+</Accordion>
+
+### Next.js Configuration
+
+The `next.config.ts` file is configured for standalone deployment:
+
+```typescript next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  output: 'standalone',
+};
+
+export default nextConfig;
+```
+
+<Note>
+  The `standalone` output mode creates a minimal production server, reducing deployment size and cold start times.
+</Note>
+
+## Deployment Methods
+
+<Tabs>
+  <Tab title="Git Integration (Recommended)">
+    ### Deploy via Git Integration
+
+    This method automatically deploys your site whenever you push to your repository.
+
+    <Steps>
+      <Step title="Connect Repository">
+        1. Log in to your [Netlify dashboard](https://app.netlify.com)
+        2. Click **"Add new site"** → **"Import an existing project"**
+        3. Choose your Git provider (GitHub, GitLab, or Bitbucket)
+        4. Authorize Netlify to access your repositories
+        5. Select the Verbalize repository
+      </Step>
+
+      <Step title="Configure Build Settings">
+        Netlify will automatically detect Next.js and pre-fill settings:
+
+        | Setting | Value | Notes |
+        |---------|-------|-------|
+        | **Build command** | `npm run build` | Auto-detected |
+        | **Publish directory** | `.next` | From `netlify.toml` |
+        | **Functions directory** | `.netlify/functions` | Auto-detected |
+
+        <Warning>
+          Ensure the **Node version** is set to **20.x** or higher in the build settings.
+        </Warning>
+      </Step>
+
+      <Step title="Configure Environment Variables">
+        While Verbalize doesn't require environment variables by default, you may want to add:
+
+        ```bash
+        # Optional: Increase max input size
+        MAX_INPUT_SIZE=2097152
+
+        # Optional: Enable debug logging
+        DEBUG=vale:*
+        ```
+
+        Navigate to **Site settings** → **Environment variables** → **Add a variable**
+      </Step>
+
+      <Step title="Deploy">
+        Click **"Deploy site"** to start the initial deployment.
+
+        Netlify will:
+        1. Clone your repository
+        2. Run `npm install` (which installs Vale via `postinstall` script)
+        3. Run `npm run build`
+        4. Deploy the `.next` directory
+        5. Bundle Vale binary and styles with the API function
+
+        <Accordion title="Expected build log output">
+          ```bash
+          # Installation phase
+          npm install
+          > postinstall
+          > node scripts/install-vale.js
+          Downloading Vale from https://github.com/errata-ai/vale/releases/...
+          Extracting vale from tar.gz...
+          Vale 3.9.5 installed successfully as vale
+
+          # Build phase
+          npm run build
+          ▲ Next.js 16.1.6
+          Creating an optimized production build...
+          ✓ Compiled successfully
+          ```
+        </Accordion>
+      </Step>
+
+      <Step title="Verify Deployment">
+        Once deployment completes:
+        1. Netlify provides a unique URL (e.g., `https://amazing-site-abc123.netlify.app`)
+        2. Open the URL in your browser
+        3. Test the linting functionality with sample text
+        4. Check the Netlify Functions logs for any errors
+      </Step>
+    </Steps>
+
+    ### Automatic Deployments
+
+    With Git integration enabled:
+
+    | Branch | Behavior |
+    |--------|----------|
+    | **Production branch** (main/master) | Deploys to production URL |
+    | **Other branches** | Creates deploy preview with unique URL |
+    | **Pull requests** | Generates preview URL in PR comments |
+
+    <Tip>
+      Configure **branch deploys** in Site settings → Build & deploy → Deploy contexts
+    </Tip>
+  </Tab>
+
+  <Tab title="Netlify CLI">
+    ### Deploy via Netlify CLI
+
+    For manual deployments or testing, use the Netlify CLI.
+
+    <Steps>
+      <Step title="Install Netlify CLI">
+        ```bash
+        npm install -g netlify-cli
+        ```
+      </Step>
+
+      <Step title="Authenticate">
+        ```bash
+        netlify login
+        ```
+
+        This opens a browser window for authentication.
+      </Step>
+
+      <Step title="Initialize Site (First Time)">
+        ```bash
+        netlify init
+        ```
+
+        Choose **"Create & configure a new site"** and follow the prompts.
+      </Step>
+
+      <Step title="Deploy">
+        <CodeGroup>
+          ```bash Draft Deploy
+          # Deploy to a draft URL (for testing)
+          netlify deploy
+          ```
+
+          ```bash Production Deploy
+          # Deploy to production
+          netlify deploy --prod
+          ```
+        </CodeGroup>
+
+        <Warning>
+          Always test with a draft deploy before pushing to production.
+        </Warning>
+      </Step>
+    </Steps>
+
+    ### CLI Deployment Benefits
+
+    - Test deployments locally before pushing to Git
+    - Deploy from branches without setting up branch deploys
+    - Useful for CI/CD pipelines outside of Git integration
+  </Tab>
+
+  <Tab title="Drag & Drop">
+    ### Manual Drag & Drop Deploy
+
+    <Warning>
+      This method is **not recommended** for Verbalize because the Vale binary must be installed during the build process.
+    </Warning>
+
+    If you still want to use this method:
+
+    <Steps>
+      <Step title="Build Locally">
+        ```bash
+        npm install
+        npm run build
+        ```
+      </Step>
+
+      <Step title="Prepare Deployment Package">
+        Create a deployment directory with:
+        ```bash
+        mkdir deploy
+        cp -r .next deploy/
+        cp vale deploy/
+        cp -r styles deploy/
+        cp package.json deploy/
+        cp netlify.toml deploy/
+        ```
+      </Step>
+
+      <Step title="Deploy">
+        1. Navigate to [Netlify Drop](https://app.netlify.com/drop)
+        2. Drag the `deploy` folder onto the page
+        3. Wait for deployment to complete
+      </Step>
+    </Steps>
+
+    <Note>
+      Manual deployments don't support automatic updates. Use Git integration for production sites.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Post-Deployment Configuration
+
+### Custom Domain Setup
+
+<Steps>
+  <Step title="Add Custom Domain">
+    Navigate to **Site settings** → **Domain management** → **Add custom domain**
+  </Step>
+
+  <Step title="Configure DNS">
+    Netlify provides DNS configuration instructions for your domain registrar:
+
+    | Record Type | Name | Value |
+    |-------------|------|-------|
+    | **A** | @ | 75.2.60.5 |
+    | **CNAME** | www | [your-site].netlify.app |
+  </Step>
+
+  <Step title="Enable HTTPS">
+    Netlify automatically provisions SSL certificates via Let's Encrypt.
+
+    <Tip>
+      Enable **Force HTTPS** in Domain settings to redirect all HTTP traffic to HTTPS.
+    </Tip>
+  </Step>
+</Steps>
+
+### Function Configuration
+
+#### Timeout Settings
+
+By default, Netlify Functions have a 10-second timeout. For large documents, you may need to increase this:
+
+```toml netlify.toml
+[functions]
+  timeout = 30
+  included_files = ["vale", "styles/**"]
+```
+
+<Warning>
+  Timeouts beyond 10 seconds require a paid Netlify plan.
+</Warning>
+
+#### Function Logs
+
+Monitor API function execution:
+
+1. Navigate to **Functions** in the Netlify dashboard
+2. Click on the function (e.g., `api/lint`)
+3. View real-time logs and error traces
+
+<Accordion title="Common log entries">
+  ```bash
+  # Successful lint request
+  START RequestId: abc123
+  Vale execution completed successfully
+  END RequestId: abc123
+  REPORT Duration: 234.56 ms
+
+  # Vale execution error
+  START RequestId: def456
+  Error: spawn vale ENOENT
+  END RequestId: def456
+  ```
+</Accordion>
+
+## Testing Your Deployment
+
+<Steps>
+  <Step title="Smoke Test">
+    1. Open your deployed site URL
+    2. Enter sample text in the editor
+    3. Select a style guide
+    4. Click "Lint Documentation"
+    5. Verify results appear within 2-3 seconds
+  </Step>
+
+  <Step title="Performance Test">
+    Test with a large document (close to 1MB limit):
+
+    ```bash
+    # Generate a large test file
+    for i in {1..10000}; do echo "This is line $i of the test document."; done > large-test.md
+    ```
+
+    Paste the contents and verify:
+    - No timeout errors
+    - Results return within acceptable time (< 10 seconds)
+  </Step>
+
+  <Step title="Style Guide Test">
+    Test each style guide independently:
+    - Google Developer Style Guide
+    - Microsoft Writing Style Guide
+    - Red Hat Documentation Style Guide
+
+    Ensure all three return appropriate lint suggestions.
+  </Step>
+
+  <Step title="Error Handling Test">
+    Verify error scenarios:
+    - Submit empty text (should show validation error)
+    - Submit text exceeding 1MB (should show size error)
+    - Simulate slow network (check for proper loading states)
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with 'Vale not found'">
+    **Symptom:**
+    ```bash
+    Error: vale binary not found during build
+    ```
+
+    **Solution:**
+    1. Verify `postinstall` script exists in `package.json`:
+    ```json
+    "scripts": {
+      "postinstall": "node scripts/install-vale.js"
+    }
+    ```
+    2. Check that `scripts/install-vale.js` exists in your repository
+    3. Verify Node.js version is 20.x or higher in Netlify settings
+  </Accordion>
+
+  <Accordion title="Function timeout errors">
+    **Symptom:**
+    ```
+    Error: Task timed out after 10.00 seconds
+    ```
+
+    **Solution:**
+    1. Reduce document size (optimize for < 50KB)
+    2. Increase function timeout in `netlify.toml`:
+    ```toml
+    [functions]
+      timeout = 30
+    ```
+    3. Consider implementing request queuing for large documents
+  </Accordion>
+
+  <Accordion title="Style guides not loading in production">
+    **Symptom:**
+    ```
+    Error: Could not find style 'Google'
+    ```
+
+    **Solution:**
+    Verify `netlify.toml` includes style files:
+    ```toml
+    [functions]
+      included_files = ["vale", "styles/**"]
+    ```
+
+    Ensure the `styles/` directory is committed to your repository.
+  </Accordion>
+
+  <Accordion title="Cold start performance">
+    **Symptom:**
+    First request after inactivity takes 5+ seconds.
+
+    **Solution:**
+    This is expected behavior for serverless functions. Mitigate by:
+    - Implementing function warming (periodic pings)
+    - Using Netlify's **Background Functions** for pre-warming
+    - Upgrading to a paid plan with faster cold starts
+  </Accordion>
+</AccordionGroup>
+
+## Continuous Deployment Workflow
+
+### Recommended Git Workflow
+
+```bash
+# Create feature branch
+git checkout -b feature/new-style-guide
+
+# Make changes and test locally
+npm run dev
+npm test
+
+# Commit and push
+git add .
+git commit -m "Add new style guide support"
+git push origin feature/new-style-guide
+
+# Create pull request
+# Netlify automatically creates a deploy preview
+# Review the preview URL before merging
+
+# After PR approval, merge to main
+# Netlify automatically deploys to production
+```
+
+### Deploy Notifications
+
+Enable notifications for deployment status:
+
+1. Navigate to **Site settings** → **Build & deploy** → **Deploy notifications**
+2. Add integrations:
+   - **Slack**: Post deployment updates to a channel
+   - **Email**: Receive notifications on build failures
+   - **Webhook**: Integrate with custom monitoring tools
+
+## Performance Optimization
+
+<CardGroup cols={2}>
+  <Card title="Enable Netlify Edge" icon="bolt">
+    Serve static assets from edge locations for faster global access
+  </Card>
+  <Card title="Asset Optimization" icon="image">
+    Next.js automatically optimizes images and fonts
+  </Card>
+  <Card title="Function Bundling" icon="box">
+    Minimize function size by only including necessary files
+  </Card>
+  <Card title="Caching Strategy" icon="clock">
+    Configure cache headers for static assets in `netlify.toml`
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration Guide" icon="gear" href="/deployment/configuration">
+    Learn about environment variables and Vale configuration
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/resources/troubleshooting">
+    Common deployment issues and solutions
+  </Card>
+</CardGroup>

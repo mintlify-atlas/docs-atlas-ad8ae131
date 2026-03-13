@@ -1,0 +1,457 @@
+---
+title: 'Custom Rules'
+description: 'Create and upload custom Vale rules to enforce organization-specific style requirements'
+icon: 'file-code'
+---
+
+## Overview
+
+Custom rules extend Verbalize's built-in style guides with organization-specific linting requirements. Upload Vale YAML rule files to enforce custom terminology, writing patterns, or style conventions alongside Google, Microsoft, or Red Hat style guides.
+
+<Info>
+Custom rules are combined with your selected base style guide and applied during linting operations. They use the same Vale rule syntax as the built-in style guides.
+</Info>
+
+## Uploading Custom Rules
+
+Add custom rules from the sidebar interface:
+
+```typescript
+// From app/page.tsx:84-98
+const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files) return;
+
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setCustomRules(prev => [...prev, { name: file.name, content }]);
+    };
+    reader.readAsText(file);
+  });
+  // Reset file input
+  if (fileInputRef.current) fileInputRef.current.value = '';
+};
+```
+
+**Features:**
+- Upload multiple `.yml` files simultaneously
+- Rules are stored in memory during the session
+- Each rule displays with filename in the sidebar
+- Remove rules individually with the trash icon
+
+### Custom Rule Interface
+
+```typescript
+// From app/page.tsx:23-26
+interface CustomRule {
+  name: string;    // Filename of the uploaded rule
+  content: string; // YAML content of the rule
+}
+```
+
+## Example Custom Rule
+
+Verbalize provides an example rule file for download:
+
+```yaml
+extends: existence
+message: "Consider removing '%s'"
+level: suggestion
+tokens:
+  - very
+  - extremely
+  - really
+  - quite
+  - perhaps
+```
+
+This rule flags weak intensifiers that can usually be removed to strengthen technical writing.
+
+<Note>
+Download the example rule from the sidebar by clicking the "Example" link next to the "Custom Rules" label. The file is served from `/public/example-style.yml`.
+</Note>
+
+## Vale Rule Syntax
+
+Custom rules use Vale's YAML-based rule format. Each rule consists of:
+
+### Rule Types (extends)
+
+<Tabs>
+  <Tab title="existence">
+    Checks for the presence of specific tokens:
+
+    ```yaml
+    extends: existence
+    message: "Avoid using '%s'"
+    level: warning
+    tokens:
+      - utilize
+      - leverage
+      - synergy
+    ```
+
+    **Use case:** Flagging discouraged words or phrases
+  </Tab>
+  <Tab title="substitution">
+    Suggests replacements for matched text:
+
+    ```yaml
+    extends: substitution
+    message: "Use '%s' instead of '%s'"
+    level: error
+    swap:
+      e.g.: for example
+      i.e.: that is
+      etc.: and so on
+    ```
+
+    **Use case:** Enforcing terminology standards
+  </Tab>
+  <Tab title="occurrence">
+    Limits how many times something appears:
+
+    ```yaml
+    extends: occurrence
+    message: "Use '%s' at most %d times per paragraph"
+    level: suggestion
+    scope: paragraph
+    max: 3
+    token: however
+    ```
+
+    **Use case:** Preventing overuse of transition words
+  </Tab>
+  <Tab title="repetition">
+    Detects repeated words:
+
+    ```yaml
+    extends: repetition
+    message: "'%s' is repeated"
+    level: error
+    alpha: true
+    tokens:
+      - '\b(\w+)\s+\1\b'
+    ```
+
+    **Use case:** Catching accidental word duplications
+  </Tab>
+  <Tab title="consistency">
+    Enforces consistent choices:
+
+    ```yaml
+    extends: consistency
+    message: "Inconsistent spelling of '%s'"
+    level: error
+    either:
+      email:
+        - e-mail
+        - email
+      web site:
+        - website
+        - web site
+    ```
+
+    **Use case:** Standardizing variant spellings
+  </Tab>
+  <Tab title="capitalization">
+    Checks capitalization patterns:
+
+    ```yaml
+    extends: capitalization
+    message: "'%s' should be in title case"
+    level: warning
+    match: $title
+    scope: heading.h1
+    ```
+
+    **Use case:** Enforcing heading capitalization styles
+  </Tab>
+</Tabs>
+
+### Severity Levels
+
+```yaml
+level: error       # Red badge - critical violations
+level: warning     # Yellow badge - should be addressed
+level: suggestion  # Blue badge - optional improvements
+```
+
+### Common Properties
+
+| Property | Description | Example |
+|----------|-------------|----------|
+| `extends` | Base rule type | `existence`, `substitution` |
+| `message` | User-facing alert text | `"Avoid using '%s'"` |
+| `level` | Severity | `error`, `warning`, `suggestion` |
+| `link` | Documentation URL | `https://example.com/style-guide` |
+| `scope` | Where rule applies | `heading`, `paragraph`, `sentence` |
+| `ignorecase` | Case-insensitive matching | `true` or `false` |
+| `tokens` | Words/patterns to match | List of strings or regexes |
+
+## API Processing
+
+Custom rules are validated and processed server-side:
+
+```typescript
+// From app/api/lint/route.ts:14, 33-43
+const MAX_CUSTOM_RULES = 10;
+const MAX_RULE_LENGTH = 10 * 1024; // 10KB
+
+if (customRules && Array.isArray(customRules)) {
+  if (customRules.length > MAX_CUSTOM_RULES) {
+    return NextResponse.json({ error: `Too many custom rules. Maximum is ${MAX_CUSTOM_RULES}` }, { status: 400 });
+  }
+
+  for (const rule of customRules) {
+    if (rule.content && typeof rule.content === 'string' && rule.content.length > MAX_RULE_LENGTH) {
+      return NextResponse.json({ error: `Rule "${rule.name}" exceeds maximum allowed length of ${MAX_RULE_LENGTH} characters` }, { status: 400 });
+    }
+  }
+}
+```
+
+**Limits:**
+- Maximum 10 custom rules per session
+- Maximum 10KB per rule file
+- All rules must be valid YAML
+
+## Creating the Custom Style
+
+The API creates a temporary `Custom` style directory during linting:
+
+```typescript
+// From app/api/lint/route.ts:72-98
+if (customRules && Array.isArray(customRules) && customRules.length > 0) {
+  const customStyleDir = path.join(tempStylesDir, 'Custom');
+  await fs.mkdir(customStyleDir, { recursive: true });
+
+  // Add a minimal meta.json for the Custom style to be recognized by Vale
+  await fs.writeFile(path.join(customStyleDir, 'meta.json'), JSON.stringify({
+    name: 'Custom',
+    description: 'User-uploaded rules',
+    feed: ''
+  }));
+
+  for (const rule of customRules) {
+    if (rule.name && rule.content) {
+      // Ensure rule name ends with .yml
+      const ruleName = rule.name.endsWith('.yml') ? rule.name : `${rule.name}.yml`;
+      // Normalize and sanitize the rule name to prevent path traversal
+      const baseName = path.basename(ruleName);
+      const safeRuleName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      if (!safeRuleName || safeRuleName === '.' || safeRuleName === '..') {
+        continue;
+      }
+      await fs.writeFile(path.join(customStyleDir, safeRuleName), rule.content);
+    }
+  }
+
+  basedOnStyles = `${style}, Custom`;
+}
+```
+
+**Security measures:**
+- Filename sanitization prevents path traversal attacks
+- Only alphanumeric characters, dots, underscores, and hyphens allowed
+- Files written to isolated temporary directory
+- Directory deleted after linting completes
+
+## Vale Configuration
+
+Custom rules are added to the Vale configuration:
+
+```ini
+# From app/api/lint/route.ts:100-105
+StylesPath = /tmp/vale-xxxxx/styles
+MinAlertLevel = suggestion
+[*.md]
+BasedOnStyles = Google, Custom
+```
+
+Vale loads rules from both the selected base style (Google, Microsoft, or RedHat) and the Custom style directory.
+
+## Real-World Examples
+
+### Company Product Names
+
+Enforce proper capitalization of product names:
+
+```yaml
+extends: substitution
+message: "Use '%s' instead of '%s'"
+level: error
+ignorecase: true
+swap:
+  acme api: ACME API
+  acme platform: ACME Platform
+  acme cloud: ACME Cloud
+```
+
+### Banned Phrases
+
+Prevent use of deprecated or incorrect terminology:
+
+```yaml
+extends: existence
+message: "Don't use '%s'. Use the approved term instead."
+level: error
+link: https://company.com/style-guide/terminology
+tokens:
+  - on-premise
+  - login (as a verb)
+  - simply
+  - easy
+  - obviously
+```
+
+### Consistent Abbreviations
+
+Ensure abbreviations are expanded on first use:
+
+```yaml
+extends: conditional
+message: "Define '%s' on first use"
+level: warning
+scope: text
+first: '\b(API|SDK|CLI|REST|JSON|XML)\b'
+second: '(Application Programming Interface|Software Development Kit|Command Line Interface|Representational State Transfer|JavaScript Object Notation|Extensible Markup Language)'
+```
+
+### Sentence Length
+
+Flag overly long sentences:
+
+```yaml
+extends: occurrence
+message: "Sentences should be under 25 words"
+level: suggestion
+scope: sentence
+max: 25
+token: '\b\w+\b'
+```
+
+### Technical Accuracy
+
+Enforce correct technical phrasing:
+
+```yaml
+extends: substitution
+message: "Use '%s' instead of '%s' for technical accuracy"
+level: error
+swap:
+  URL address: URL
+  IP address number: IP address
+  SSL certificate: TLS certificate
+  click on: click
+  SSL/TLS: TLS
+```
+
+## Managing Custom Rules
+
+The sidebar displays all uploaded rules:
+
+```typescript
+// From app/page.tsx:260-268
+<div className="space-y-2">
+  {customRules.map((rule, idx) => (
+    <div key={idx} className="flex items-center justify-between p-2.5 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg border border-blue-100/50 dark:border-blue-800/50">
+      <span className="text-[11px] font-mono truncate mr-2 text-blue-700 dark:text-blue-400">{rule.name}</span>
+      <button onClick={() => removeCustomRule(idx)} className="text-blue-300 hover:text-red-500 transition-colors">
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  ))}
+</div>
+```
+
+**Remove a rule:**
+
+```typescript
+// From app/page.tsx:113-115
+const removeCustomRule = (index: number) => {
+  setCustomRules(prev => prev.filter((_, i) => i !== index));
+};
+```
+
+## Linting with Custom Rules
+
+Custom rules are sent to the API alongside the text and base style:
+
+```typescript
+// From app/page.tsx:64-68
+const response = await fetch('/api/lint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ text: normalizedText, style, customRules }),
+});
+```
+
+Results include alerts from both built-in and custom rules with identical formatting.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start with Templates" icon="copy">
+    Download and modify the example rule rather than writing from scratch to avoid YAML syntax errors
+  </Card>
+  <Card title="Test Incrementally" icon="flask">
+    Upload one custom rule at a time and test thoroughly before adding more complex rules
+  </Card>
+  <Card title="Use Descriptive Messages" icon="message">
+    Write clear alert messages that explain why the issue matters and what to do instead
+  </Card>
+  <Card title="Link to Documentation" icon="link">
+    Include a `link` property pointing to your internal style guide for detailed explanations
+  </Card>
+  <Card title="Choose Appropriate Levels" icon="chart-line">
+    Reserve `error` level for critical issues and use `suggestion` for optional improvements
+  </Card>
+  <Card title="Avoid Over-Constraining" icon="scale-balanced">
+    Balance style enforcement with writing flexibility to avoid frustrating authors
+  </Card>
+</CardGroup>
+
+## Debugging Rules
+
+If a custom rule doesn't work as expected:
+
+1. **Validate YAML syntax** - Use a YAML validator to check for formatting errors
+2. **Check the `extends` type** - Ensure you're using the correct base rule type for your pattern
+3. **Test token patterns** - Use Vale's test mode to verify your regex patterns match correctly
+4. **Review Vale documentation** - Consult [Vale's style guide docs](https://vale.sh/docs/topics/styles/) for rule type details
+5. **Simplify first** - Start with a basic rule and add complexity incrementally
+
+<Note>
+Vale rule errors don't appear in the UI - the rule simply won't trigger. Check the browser console and network tab for any API errors if rules aren't working.
+</Note>
+
+## Vale Rule Resources
+
+<CardGroup cols={2}>
+  <Card title="Vale Documentation" icon="book" href="https://vale.sh/docs/topics/styles/">
+    Official guide to writing Vale rules with all rule types documented
+  </Card>
+  <Card title="Vale Package Hub" icon="box" href="https://vale.sh/hub/">
+    Browse community-created Vale style packages for inspiration
+  </Card>
+  <Card title="Vale Regex Tester" icon="magnifying-glass" href="https://vale.sh/playground/">
+    Test your regex patterns in Vale's online playground
+  </Card>
+  <Card title="GitHub Examples" icon="github" href="https://github.com/errata-ai/styles">
+    Explore real Vale rules from Google, Microsoft, and other style guides
+  </Card>
+</CardGroup>
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Style Guides" icon="book" href="/features/style-guides">
+    Learn about the built-in Google, Microsoft, and Red Hat style guides
+  </Card>
+  <Card title="Editor" icon="pen" href="/features/editor">
+    Understand how linting results appear in the editor interface
+  </Card>
+</CardGroup>
